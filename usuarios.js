@@ -35,9 +35,15 @@ import {ventana as abrirRespaldo} from "./respaldo.js";
 const ROLES={admin:'Administrador',ministerio:'Ministerio',usuario:'Usuario (solo ver)'};
 
 const st=document.createElement('style');
-st.textContent=`header .btn-cuenta{margin-left:auto;margin-right:8px;background:#ffffff14;color:#DDE3F5;min-height:36px;padding:6px 12px;font-size:14px;flex:none;display:inline-flex;align-items:center;gap:6px}
-header .btn-cuenta:hover{background:#ffffff26;filter:none}
-@media(max-width:480px){header .btn-cuenta span{display:none}header .btn-cuenta{width:40px;padding:0;justify-content:center}}
+st.textContent=`header .menu-usuario{position:relative;margin-left:auto}
+header .btn-usuario{background:#ffffff14;color:#DDE3F5;min-height:36px;padding:6px 12px;font-size:14px;flex:none;display:inline-flex;align-items:center;gap:6px;max-width:160px}
+header .btn-usuario span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header .btn-usuario:hover{background:#ffffff26;filter:none}
+header .dd-usuario{position:absolute;right:0;top:100%;margin-top:6px;z-index:12;background:var(--blanco);border:1px solid var(--linea);border-radius:14px;box-shadow:var(--sombra-2);padding:8px;min-width:200px;display:grid;gap:2px}
+header .dd-usuario .nombre{padding:8px 10px 10px;font-weight:700;color:var(--tx);border-bottom:1px solid var(--linea);margin-bottom:4px}
+header .dd-usuario button{background:transparent;color:var(--tx);justify-content:flex-start;text-align:left;min-height:38px}
+header .dd-usuario button:hover{background:var(--capa);filter:none}
+@media(max-width:480px){header .btn-usuario{max-width:40px;padding:0;justify-content:center}header .btn-usuario span{display:none}}
 [data-vista=usuarios] .config{background:var(--capa);border-radius:var(--r-m);padding:14px;margin-bottom:18px;display:flex;flex-direction:column;gap:10px}
 [data-vista=usuarios] .config .mb2{margin:0}
 [data-vista=usuarios] .ulist{display:grid;gap:8px;margin-top:14px}
@@ -99,18 +105,29 @@ function puedeGestionar(u,actor){
   return esMinisterioTier(actor)&&(u.ministerioId||null)===miMinisterio(actor);
 }
 
-// ---------- Mi cuenta (cualquier rol): datos propios, ministerio al que pertenece y contraseña ----------
-export function montarMiCuenta(){
+// ---------- Menú de usuario en la cabecera: nombre, Mi cuenta, Configuración y Salir ----------
+// (no van en la barra de navegación: son acciones de la cuenta, no secciones de contenido)
+export function montarMenuUsuario(salir){
+  const actor=sesion();
   const header=document.querySelector('header');
-  if(!header||!sesion()||header.querySelector('.btn-cuenta'))return;
-  const b=document.createElement('button');
-  b.className='btn-cuenta';
-  b.title='Mi cuenta';
-  b.setAttribute('aria-label','Mi cuenta');
-  b.innerHTML=ic('usr',16)+'<span>Mi cuenta</span>';
-  b.onclick=formMiCuenta;
-  const salir=header.querySelector('.salir');
-  if(salir)header.insertBefore(b,salir);else header.append(b);
+  if(!header||!actor||header.querySelector('.menu-usuario'))return;
+  const cont=document.createElement('div');
+  cont.className='menu-usuario';
+  cont.innerHTML=`<button class="btn-usuario" aria-haspopup="true" aria-expanded="false"><span>${esc(actor.nombre||actor.usuario)}</span> &#9662;</button>
+    <div class="dd-usuario" hidden>
+      <div class="nombre">${esc(actor.nombre||actor.usuario)}</div>
+      <button data-mc>${ic('usr',15)} Mi cuenta</button>
+      ${puedeEditar()?`<button data-cfg>${ic('cfg',15)} Configuración</button>`:''}
+      <button data-sal>${ic('out',15)} Salir</button>
+    </div>`;
+  const boton=cont.querySelector('.btn-usuario'),dd=cont.querySelector('.dd-usuario');
+  const cerrar=()=>{dd.hidden=true;boton.setAttribute('aria-expanded','false')};
+  boton.onclick=()=>{const abrir=dd.hidden;dd.hidden=!abrir;boton.setAttribute('aria-expanded',String(abrir))};
+  document.addEventListener('click',e=>{if(!dd.hidden&&!cont.contains(e.target))cerrar()});
+  cont.querySelector('[data-mc]').onclick=()=>{cerrar();formMiCuenta()};
+  const cfgBtn=cont.querySelector('[data-cfg]');if(cfgBtn)cfgBtn.onclick=()=>{cerrar();location.hash='usuarios'};
+  cont.querySelector('[data-sal]').onclick=()=>{cerrar();salir()};
+  header.append(cont);
 }
 function formMiCuenta(){
   const actor=sesion();if(!actor)return;
@@ -132,6 +149,7 @@ function formMiCuenta(){
     if(c1)cambios.clave=c1;
     guardar('usuarios',actor.id,cambios);
     establecerSesion({...actor,...cambios});
+    document.querySelectorAll('.menu-usuario .btn-usuario span,.menu-usuario .dd-usuario .nombre').forEach(elx=>elx.textContent=cambios.nombre);
     o.remove();aviso('Datos actualizados.');
   };
   o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.id==='ok')aceptar()};

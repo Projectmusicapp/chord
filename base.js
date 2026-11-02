@@ -122,12 +122,9 @@ document.addEventListener('keydown',e=>{
 
 // ===== NAVEGACIÓN (la barra de arriba solo muestra los botones dentro de las pantallas) =====
 export const vistas={};
-// menuDe: igual para todos, salvo «Usuarios» (cuentas y permisos), que solo ven quienes pueden editar algo.
-const menuDe=()=>{
-  const m=[['calendario','cal','Calendario','Eventos y ensayos'],['repertorio','mus','Repertorio','Misas, eventos y PDF'],['canciones','dsc','Canciones','Letras y acordes'],['escalas','usr','Escalas','Equipos por día']];
-  if(puedeEditar())m.push(['usuarios','cfg','Usuarios','Cuentas y permisos']);
-  return m;
-};
+// menuDe: las secciones de contenido. «Usuarios» (cuentas, nombre/logo, copia de seguridad)
+// no va aquí: se abre como «Configuración» desde el menú de la cuenta, en la cabecera.
+const menuDe=()=>[['calendario','cal','Calendario','Eventos y ensayos'],['repertorio','mus','Repertorio','Misas, eventos y PDF'],['canciones','dsc','Canciones','Letras y acordes'],['escalas','usr','Escalas','Equipos por día']];
 const vista=()=>location.hash.slice(1)||'inicio';
 let vistaAnterior=null,todoCargado=false;
 // login.js avisa cuando ya se cargaron todas las pantallas (antes de eso no se muestra «Esta página no existe»)
