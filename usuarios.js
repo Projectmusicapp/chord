@@ -255,18 +255,16 @@ function formEditar(u){
   const o=modal(`<div class="mh"><h2>Editar cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" value="${esc(u.nombre||'')}" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Usuario<input id="fu" value="${esc(u.usuario)}" autocomplete="off"></label>
-    <label class="fl2" style="margin-bottom:12px">Nueva contraseña (vacío = no cambiar)<input id="fc" type="text" autocomplete="off"></label>
+    <p style="margin:0 0 12px;color:var(--gris);font-size:13.5px">La contraseña solo la cambia cada cuenta desde el botón «Contraseña» de su propia sesión.</p>
     <label class="chk" style="margin:2px 0 14px"><input type="checkbox" id="fa" ${u.activo===false?'':'checked'}> Cuenta activa (puede iniciar sesión)</label>
     <p class="error" role="alert" hidden></p>
     <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Guardar</button></div>`);
   const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
   const aceptar=()=>{
-    const nombre=$('#fn',o).value.trim(),usuario=$('#fu',o).value.trim(),clave=$('#fc',o).value,activo=$('#fa',o).checked;
+    const nombre=$('#fn',o).value.trim(),usuario=$('#fu',o).value.trim(),activo=$('#fa',o).checked;
     if(!usuario)return err('Escribe un usuario.');
     if(U.some(x=>x.id!==u.id&&x.usuario.trim().toLowerCase()===usuario.toLowerCase()))return err('Ya existe otra cuenta con ese usuario.');
-    const cambios={usuario,nombre:nombre||usuario,activo};
-    if(clave)cambios.clave=clave;
-    guardar('usuarios',u.id,cambios);
+    guardar('usuarios',u.id,{usuario,nombre:nombre||usuario,activo});
     o.remove();aviso('Cambios guardados.');
   };
   o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.id==='ok')aceptar()};

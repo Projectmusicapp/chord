@@ -170,10 +170,11 @@ vistas.inicio=el=>{
     <h1>${esc(cfg.nombre)}</h1>
     <p class="sub">${hoyLargo()}</p>
     <div class="menu4">${menuDe().map(([k,i,n,d])=>`<a href="#${k}"><span class="mi">${ic(i,34)}</span><span>${n}</span><small>${d}</small></a>`).join('')}</div>
-    <div class="ajustes">${admin?`<button id="bl">${ic('img',16)} Cambiar logo</button><button id="bn">${ic('edt',16)} Cambiar nombre</button><input type="file" id="fl" accept="image/*" hidden>`:''}</div>
+    <div class="ajustes">${admin?`<button id="bl">${ic('img',16)} Cambiar logo</button>${cfg.logo?`<button class="sec" id="bq">${ic('x',16)} Quitar logo</button>`:''}<button id="bn">${ic('edt',16)} Cambiar nombre</button><input type="file" id="fl" accept="image/*" hidden>`:''}</div>
   </div>`;
   const bl=$('#bl');if(bl)bl.onclick=()=>$('#fl').click();
   const fl=$('#fl');if(fl)fl.onchange=async e=>guardar('config','app',{logo:await imagen(e.target.files[0],200)});
+  const bq=$('#bq');if(bq)bq.onclick=()=>{if(confirm('¿Quitar el logo y volver al icono por defecto?'))guardar('config','app',{logo:''})};
   const bn=$('#bn');if(bn)bn.onclick=()=>{const n=prompt('Nombre de la app',cfg.nombre);if(n)guardar('config','app',{nombre:n})};
 };
 
