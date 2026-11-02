@@ -15,10 +15,11 @@
 //   8. FORMULARIOS .......... ventanitas para álbum y artista
 //   9. ARRANQUE ............. cómo se conecta con el resto de la app
 // =====================================================================
-import {$,esc,guardar,crear,eliminar,imagen,vistas,ic,modal} from "./base.js";
+import {$,esc,guardar,crear,eliminar,imagen,vistas,ic,modal,puedeEditar,esNivelAdmin,puedeEditarAlbum} from "./base.js";
 import {E,alCambiar} from "./estado.js";
 import {abrir,editando,forzarCierre} from "./editor.js";
 import {etiquetas} from "./etiquetas.js";
+import {cancion} from "./hoja.js";
 
 // ---------------------------------------------------------------------
 // 1. ESTILOS de esta pantalla
@@ -144,25 +145,31 @@ function gruposDeAlbumes(){
 const fotoDe=alb=>alb&&alb.foto?`style="background-image:url(${alb.foto})"`:'';
 
 // menuDe: el menú ⋮ de cada álbum o canción.
-function menuDe(tipo,o,cont,manual,titulo){
+function menuDe(tipo,o,cont,manual,titulo,editable,ocultarBtn){
   const datos=`data-tipo="${tipo}" data-id="${o.id}" data-cont="${esc(cont)}"`;
   const boton=(acc,texto,clase='')=>`<button class="${clase}" data-acc="${acc}" ${datos}>${texto}</button>`;
-  const deAlbum=tipo==='album'?boton('nombre','Editar nombre')+boton('artista','Editar artista')+boton('foto','Editar foto del \u00e1lbum'):'';
-  const mover=manual?boton('atras','Mover atr\u00e1s')+boton('adelante','Mover adelante'):'';
-  return `<details><summary aria-label="Opciones de \u00ab${esc(titulo)}\u00bb" title="Opciones">&#8942;</summary><div>${deAlbum}${mover}${boton('eliminar',ic('trs',16)+' Eliminar','rojo')}</div></details>`;
+  const deAlbum=editable&&tipo==='album'?boton('nombre','Editar nombre')+boton('artista','Editar artista')+boton('foto','Editar foto del \u00e1lbum'):'';
+  const mover=editable&&manual?boton('atras','Mover atr\u00e1s')+boton('adelante','Mover adelante'):'';
+  const ocultar=ocultarBtn?boton('ocultar',o.oculto?'Mostrar a todos':'Ocultar de los dem\u00e1s'):'';
+  const elim=editable?boton('eliminar',ic('trs',16)+' Eliminar','rojo'):'';
+  if(!deAlbum&&!mover&&!ocultar&&!elim)return '';
+  return `<details><summary aria-label="Opciones de \u00ab${esc(titulo)}\u00bb" title="Opciones">&#8942;</summary><div>${deAlbum}${ocultar}${mover}${elim}</div></details>`;
 }
 
 // item: dibuja UN álbum o UNA canción (como tarjeta o como fila, según la vista).
 function item(tipo,o,cont,arrastrable){
   const esAlbum=tipo==='album',alb=esAlbum?o:E.albumes.find(a=>a.id===o.albumId);
   const titulo=esAlbum?o.nombre:o.titulo,lista=PREF.vista==='lista';
+  const editable=puedeEditarAlbum(alb),puedeArrastrar=arrastrable&&editable;
+  const ocultarBtn=esAlbum&&esNivelAdmin()&&!o.ministerioId;
   const icono=alb&&alb.foto?'':(esAlbum?ic('dsc',lista?22:40):ic('mus',lista?20:30));
   const n=esAlbum?E.canciones.filter(c=>c.albumId===o.id).length:0;
   const detalle=esAlbum?`<small>${n} ${n===1?'canci\u00f3n':'canciones'}</small>`:(cont==='busqueda'&&alb?`<small>${esc(alb.nombre)}</small>`:'');
-  const datos=`data-tipo="${tipo}" data-id="${o.id}" data-cont="${esc(cont)}" ${arrastrable?'draggable="true"':''} role="button" tabindex="0"`;
-  const menu=menuDe(tipo,o,cont,arrastrable,titulo);
-  if(lista)return `<div class="fila2" ${datos}><div class="mini" ${fotoDe(alb)}>${icono}</div><b>${esc(titulo)}${detalle}</b>${menu}</div>`;
-  return `<div class="card" ${datos}><div class="foto" ${fotoDe(alb)}>${icono}</div><b>${esc(titulo)}</b>${detalle}${menu}</div>`;
+  const datos=`data-tipo="${tipo}" data-id="${o.id}" data-cont="${esc(cont)}" ${puedeArrastrar?'draggable="true"':''} role="button" tabindex="0"`;
+  const menu=menuDe(tipo,o,cont,puedeArrastrar,titulo,editable,ocultarBtn);
+  const oc=esAlbum&&o.oculto?` <small style="color:var(--rojo)">(oculto)</small>`:'';
+  if(lista)return `<div class="fila2" ${datos}><div class="mini" ${fotoDe(alb)}>${icono}</div><b>${esc(titulo)}${oc}${detalle}</b>${menu}</div>`;
+  return `<div class="card" ${datos}><div class="foto" ${fotoDe(alb)}>${icono}</div><b>${esc(titulo)}${oc}</b>${detalle}${menu}</div>`;
 }
 
 const claseLista=(chica)=>PREF.vista==='lista'?'lst':'grid'+(chica?' chico':'');
@@ -223,7 +230,7 @@ function pintarMenu(){const m=$('.vmenu');if(m){m.innerHTML=htmlMenu();m.hidden=
 function montar(){
   el.innerHTML=`<div id="canc"><div class="barra">
       <div class="buscar" role="search"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="q" type="text" inputmode="search" enterkeyhint="search" placeholder="Buscar por nombre, etiqueta o letra" aria-label="Buscar canciones" value="${esc(busqueda)}" autocomplete="off"><button class="x" id="qx" aria-label="Borrar b\u00fasqueda" ${busqueda?'':'hidden'}>&times;</button></div>
-      <button id="na">${ic('pls',16)} Nuevo \u00e1lbum</button><button id="nc">${ic('pls',16)} Nueva canci\u00f3n</button><button class="sec" id="et">Etiquetas</button>
+      ${puedeEditar()?`<button id="na">${ic('pls',16)} Nuevo \u00e1lbum</button><button id="nc">${ic('pls',16)} Nueva canci\u00f3n</button><button class="sec" id="et">Etiquetas</button>`:''}
       <span class="vbox"><button class="sec" id="vista" aria-haspopup="true" aria-expanded="false">Vista &#9662;</button><div class="vmenu" hidden></div></span></div>
     <div id="contenido"></div><input type="file" id="ff" accept="image/*" hidden></div>`;
   const raiz=$('#canc');
@@ -279,8 +286,12 @@ function alHacerClic(e){
     crear('albumes',{nombre:v.nombre,artista:v.artista});
   });
   if(t.closest('#nc')){
-    if(!E.albumes.length)return alert('Primero crea un \u00e1lbum.');
-    return abrir({albumId:albumAbierto||ordenar(E.albumes,'az',a=>a.nombre)[0].id},pintarContenido);
+    const destino=albumAbierto?E.albumes.find(a=>a.id===albumAbierto):null;
+    if(destino&&!puedeEditarAlbum(destino))return alert('No puedes a\u00f1adir canciones a este \u00e1lbum.');
+    const editables=ordenar(E.albumes.filter(puedeEditarAlbum),'az',a=>a.nombre);
+    const albumId=destino?destino.id:editables[0]&&editables[0].id;
+    if(!albumId)return alert('Primero crea un \u00e1lbum.');
+    return abrir({albumId},pintarContenido);
   }
   if(t.closest('#et'))return etiquetas();
   if(t.closest('#vista')){menuAbierto=!menuAbierto;return pintarMenu()}
@@ -297,14 +308,23 @@ function alHacerClic(e){
   const it=t.closest('[data-tipo][data-id]');                          // clic en un álbum o canción
   if(it){
     if(it.dataset.tipo==='album'){albumAbierto=it.dataset.id;return pintarContenido()}
-    const c=E.canciones.find(x=>x.id===it.dataset.id);if(c)abrir(c,pintarContenido);
+    const c=E.canciones.find(x=>x.id===it.dataset.id);if(!c)return;
+    const alb=E.albumes.find(a=>a.id===c.albumId);
+    if(puedeEditarAlbum(alb))abrir(c,pintarContenido);else verSolo(c);
   }
+}
+
+// verSolo: para quien no puede editar, muestra la letra (y acordes) en una ventanita, sin abrir el editor.
+function verSolo(c){
+  const o=modal(`<div class="mh"><h2>${esc(c.titulo)}</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div><div class="hojap" style="padding:20px;box-shadow:none">${cancion(c,true)}</div>`);
+  o.onclick=e=>{if(e.target.closest('[data-cx]'))o.remove()};
 }
 
 // hacer: ejecuta una acción del menú ⋮.
 function hacer(acc,tipo,id,cont){
   const alb=E.albumes.find(a=>a.id===id),can=E.canciones.find(c=>c.id===id);
-  if(acc==='nombre')formulario('Editar nombre del \u00e1lbum',[{id:'nombre',etiqueta:'Nombre',valor:alb.nombre}],v=>{if(v.nombre)guardar('albumes',alb.id,{nombre:v.nombre})});
+  if(acc==='ocultar')guardar('albumes',alb.id,{oculto:!alb.oculto});
+  else if(acc==='nombre')formulario('Editar nombre del \u00e1lbum',[{id:'nombre',etiqueta:'Nombre',valor:alb.nombre}],v=>{if(v.nombre)guardar('albumes',alb.id,{nombre:v.nombre})});
   else if(acc==='artista')formulario('Artista del \u00e1lbum',[{id:'artista',etiqueta:'Artista (vac\u00edo = sin artista)',valor:artistaDe(alb),lista:listaDeArtistas()}],v=>guardar('albumes',alb.id,{artista:v.artista}));
   else if(acc==='foto'){fotoPara=alb.id;$('#ff').click()}
   else if(acc==='atras'||acc==='adelante')moverUno(tipo,id,cont,acc==='atras'?-1:1);

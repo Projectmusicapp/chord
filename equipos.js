@@ -16,14 +16,14 @@
 //   elegirEscala(sel, cb)  ventana con los días desplegables para elegir un equipo
 //   alCambiarEquipos(fn) . avisa cuando cambian días, equipos o personas
 // =====================================================================
-import {$,esc,escuchar,ic,modal} from "./base.js";
+import {$,esc,escucharPropio,ic,modal} from "./base.js";
 
 let X=[],P=[];
 const oyentes=[];
 export const alCambiarEquipos=fn=>{oyentes.push(fn)};
 const avisar=()=>oyentes.forEach(f=>f());
-escuchar('escalas',l=>{X=[...l].sort((a,b)=>(a.orden||0)-(b.orden||0));avisar()});
-escuchar('personas',l=>{P=l;avisar()});
+escucharPropio('escalas',l=>{X=[...l].sort((a,b)=>(a.orden||0)-(b.orden||0));avisar()});
+escucharPropio('personas',l=>{P=l;avisar()});
 
 const st=document.createElement('style');
 st.textContent=`.mesc details{background:var(--capa);border-radius:var(--r-m);margin-bottom:8px}

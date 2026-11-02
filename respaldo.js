@@ -1,9 +1,10 @@
 // ===== COPIA DE SEGURIDAD: descargar y restaurar todos los datos =====
-import {$,guardar,escuchar,vistas,ic,modal} from "./base.js";
+import {$,guardar,escuchar,vistas,ic,modal,esNivelAdmin} from "./base.js";
 
 const ico=(p,s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 const DL='<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>',UP='<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>';
-const COLS=['config','albumes','canciones','etiquetas','repertorios','personas','escalas','eventos','dias'];
+// Copia completa (sin separar por ministerio): solo para el nivel Administrador.
+const COLS=['config','albumes','canciones','etiquetas','repertorios','personas','escalas','eventos','dias','usuarios'];
 
 // Lee una colección completa una sola vez
 const leer=col=>new Promise(res=>{let u;u=escuchar(col,l=>{res(l);setTimeout(()=>u&&u(),0)})});
@@ -62,9 +63,10 @@ function ventana(){
 const inicio=vistas.inicio;
 vistas.inicio=el=>{
   inicio(el);
+  if(!esNivelAdmin())return;
   const barra=el.querySelector('.ajustes');if(!barra)return;
   const b=document.createElement('button');b.dataset.respaldo='';b.innerHTML=ico(DL,16)+' Copia de seguridad';b.onclick=ventana;
   barra.append(b);
 };
 // Si la pantalla de Inicio ya se dibujó antes de cargar este archivo, se añade el botón ahora
-{const app=document.getElementById('app');if(app&&app.querySelector('.ajustes')&&!app.querySelector('.ajustes [data-respaldo]'))vistas.inicio(app)}
+{const app=document.getElementById('app');if(esNivelAdmin()&&app&&app.querySelector('.ajustes')&&!app.querySelector('.ajustes [data-respaldo]'))vistas.inicio(app)}

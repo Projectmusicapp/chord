@@ -1,5 +1,5 @@
 // ===== PANTALLA: REPERTORIO (misa y evento, vista previa y PDF) =====
-import {$,esc,guardar,crear,escuchar,eliminar,vistas,ic,modal,aviso} from "./base.js";
+import {$,esc,guardar,crear,escuchar,eliminar,vistas,ic,modal,aviso,escucharPropio,visibleBiblioteca,puedeEditar} from "./base.js";
 import {MOM,MES,fechaLarga,cancion} from "./hoja.js";
 import {elegirEscala,textoEquipo,equipoDe,alCambiarEquipos} from "./equipos.js";
 
@@ -53,7 +53,18 @@ const alb=c=>A.find(a=>a.id===c.albumId)?.nombre||'';
 const titAlb=c=>`<span>${esc(c.titulo)}</span>`+(alb(c)?`<small>${esc(alb(c))}</small>`:'');
 const ref=()=>{if(el)rep?pder():lista()};
 alCambiarEquipos(()=>{if(el&&rep){pizq();pder()}});
-escuchar('canciones',l=>{C=l;ref()});escuchar('etiquetas',l=>{T=l;ref()});escuchar('albumes',l=>{A=l});escuchar('repertorios',l=>{R=l;ref()});
+let crudoA=[],crudoC=[];
+function recalcBiblioteca(){
+  A=crudoA.filter(visibleBiblioteca);
+  const ids=new Set(A.map(a=>a.id));
+  C=crudoC.filter(c=>ids.has(c.albumId));
+  ref();
+}
+escuchar('albumes',l=>{crudoA=l;recalcBiblioteca()});
+escuchar('canciones',l=>{crudoC=l;recalcBiblioteca()});
+addEventListener('ambitocambio',recalcBiblioteca);
+escuchar('etiquetas',l=>{T=l;ref()});
+escucharPropio('repertorios',l=>{R=l;ref()});
 const rand=()=>Math.random().toString(36).slice(2,8);
 const sec=id=>rep.secciones.find(s=>s.id===id);
 const tagId=n=>T.find(t=>t.nombre.toLowerCase()===n.toLowerCase())?.id;
@@ -79,9 +90,10 @@ function lista(){
   el.className="";
   const cuadro=f=>{if(!f)return '<b>\u2013</b><span>Sin fecha</span>';const [y,m,d]=f.split('-').map(Number);return `<b>${d}</b><span>${MES[m-1].slice(0,3)}${y!==new Date().getFullYear()?' '+y:''}</span>`};
   const cuantas=r=>{const n=r.tipo==='evento'?(r.secciones||[]).reduce((a,x)=>a+(x.canciones||[]).length,0):Object.values(r.misa||{}).filter(Boolean).length;return n?n+(n>1?' canciones':' canci\u00f3n'):'Sin canciones'};
-  el.innerHTML=`<div class="ch2"><h1>Repertorios</h1><div class="rtabs"><div class="seg" role="group" aria-label="Tipo de repertorio"><button data-pest="misa" class="${pestana==='misa'?'on':''}" aria-pressed="${pestana==='misa'}">Misas</button><button data-pest="evento" class="${pestana==='evento'?'on':''}" aria-pressed="${pestana==='evento'}">Eventos</button></div><button data-nuevo aria-label="${pestana==='evento'?'Nuevo repertorio de evento':'Nuevo repertorio de misa'}" title="${pestana==='evento'?'Nuevo repertorio de evento':'Nuevo repertorio de misa'}">${ic('pls',18)}</button></div></div><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">`
-    +R.filter(r=>(r.tipo==='evento'?'evento':'misa')===pestana).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(r=>`<div class="card rcard" data-open="${r.id}" role="button" tabindex="0"><div class="cf" aria-hidden="true">${cuadro(r.fecha)}</div><div class="ri"><b>${esc(r.nombre||'Sin nombre')}</b><small>${cuantas(r)}</small><span class="tipo">${r.tipo==='evento'?'Evento':'Misa'}</span></div><button class="ic rj" data-del="${r.id}" aria-label="Eliminar \u00ab${esc(r.nombre||'Sin nombre')}\u00bb" title="Eliminar">${ic('trs',16)}</button></div>`).join('')
-    +'</div>'+(R.some(r=>(r.tipo==='evento'?'evento':'misa')===pestana)?'':`<p class="vacio">A\u00fan no hay repertorios de ${pestana==='evento'?'eventos':'misas'}. Pulsa \u00ab+\u00bb para crear el primero.</p>`);
+  const editar=puedeEditar();
+  el.innerHTML=`<div class="ch2"><h1>Repertorios</h1><div class="rtabs"><div class="seg" role="group" aria-label="Tipo de repertorio"><button data-pest="misa" class="${pestana==='misa'?'on':''}" aria-pressed="${pestana==='misa'}">Misas</button><button data-pest="evento" class="${pestana==='evento'?'on':''}" aria-pressed="${pestana==='evento'}">Eventos</button></div>${editar?`<button data-nuevo aria-label="${pestana==='evento'?'Nuevo repertorio de evento':'Nuevo repertorio de misa'}" title="${pestana==='evento'?'Nuevo repertorio de evento':'Nuevo repertorio de misa'}">${ic('pls',18)}</button>`:''}</div></div><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">`
+    +R.filter(r=>(r.tipo==='evento'?'evento':'misa')===pestana).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(r=>`<div class="card rcard" data-open="${r.id}" role="button" tabindex="0"><div class="cf" aria-hidden="true">${cuadro(r.fecha)}</div><div class="ri"><b>${esc(r.nombre||'Sin nombre')}</b><small>${cuantas(r)}</small><span class="tipo">${r.tipo==='evento'?'Evento':'Misa'}</span></div>${editar?`<button class="ic rj" data-del="${r.id}" aria-label="Eliminar \u00ab${esc(r.nombre||'Sin nombre')}\u00bb" title="Eliminar">${ic('trs',16)}</button>`:''}</div>`).join('')
+    +'</div>'+(R.some(r=>(r.tipo==='evento'?'evento':'misa')===pestana)?'':`<p class="vacio">A\u00fan no hay repertorios de ${pestana==='evento'?'eventos':'misas'}.${editar?' Pulsa \u00ab+\u00bb para crear el primero.':''}</p>`);
 }
 // nuevo(fecha, tipo, nombre, evento): crea un repertorio. El tipo (misa o evento) queda fijo.
 // Si viene de un evento del Calendario, el evento guarda el id de este repertorio.
@@ -99,18 +111,31 @@ function editor(){
 }
 function pizq(){
   const i=$('#izq');if(!i||!rep)return;
+  const editar=puedeEditar();
   const fila=([id,n])=>{const c=C.find(x=>x.id===rep.misa[id]);
-    return`<div class="mrow"><div class="mn"><b>${n}</b>${c?titAlb(c):'<em class="falta">Sin canci\u00f3n</em>'}</div><button class="ic" data-pick="${id}" aria-label="Elegir canci\u00f3n para ${n}" title="Elegir">${ic('edt',15)}</button><button class="ic" data-rnd="${id}" aria-label="Canci\u00f3n al azar para ${n}" title="Al azar">${ico(SHF,15)}</button>${c?`<button class="ic rj" data-rm="${id}" aria-label="Quitar canci\u00f3n de ${n}" title="Quitar">${ic('x',15)}</button>`:''}</div>`};
-  const secs=s=>`<div class="sec2"><div class="dh"><input class="inl" data-sn="${s.id}" value="${esc(s.nombre)}" placeholder="Nombre de la secci\u00f3n"><button class="ic" data-sesc="${s.id}" aria-label="Elegir escala de esta secci\u00f3n" title="Elegir escala">${ic('usr',15)}</button><button class="ic rj" data-sdel="${s.id}" aria-label="Eliminar secci\u00f3n">${ic('trs',15)}</button></div>
+    const base=`<div class="mn"><b>${n}</b>${c?titAlb(c):'<em class="falta">Sin canci\u00f3n</em>'}</div>`;
+    if(!editar)return `<div class="mrow">${base}</div>`;
+    return`<div class="mrow">${base}<button class="ic" data-pick="${id}" aria-label="Elegir canci\u00f3n para ${n}" title="Elegir">${ic('edt',15)}</button><button class="ic" data-rnd="${id}" aria-label="Canci\u00f3n al azar para ${n}" title="Al azar">${ico(SHF,15)}</button>${c?`<button class="ic rj" data-rm="${id}" aria-label="Quitar canci\u00f3n de ${n}" title="Quitar">${ic('x',15)}</button>`:''}</div>`};
+  const secs=s=>{
+    const canciones=s.canciones.map(id=>{const c=C.find(x=>x.id===id);if(!c)return '';
+      return editar?`<div class="mrow"><div class="mn">${titAlb(c)}</div><button class="ic rj" data-srm="${s.id}:${id}" aria-label="Quitar">${ic('x',15)}</button></div>`:`<div class="mrow"><div class="mn">${titAlb(c)}</div></div>`}).join('');
+    if(!editar)return `<div class="sec2"><div class="dh"><b>${esc(s.nombre||'Secci\u00f3n')}</b></div>${textoEquipo(s.escala)?`<div class="escsec">${ic('usr',14)}<span>${esc(textoEquipo(s.escala))}</span></div>`:''}${canciones}</div>`;
+    return `<div class="sec2"><div class="dh"><input class="inl" data-sn="${s.id}" value="${esc(s.nombre)}" placeholder="Nombre de la secci\u00f3n"><button class="ic" data-sesc="${s.id}" aria-label="Elegir escala de esta secci\u00f3n" title="Elegir escala">${ic('usr',15)}</button><button class="ic rj" data-sdel="${s.id}" aria-label="Eliminar secci\u00f3n">${ic('trs',15)}</button></div>
     ${textoEquipo(s.escala)?`<div class="escsec">${ic('usr',14)}<span>${esc(textoEquipo(s.escala))}</span><button data-sescq="${s.id}" aria-label="Quitar escala" title="Quitar escala">${ic('x',13)}</button></div>`:''}
     <label class="fl2">Opciones de canciones<select data-st="${s.id}"><option value="">Todas las canciones</option>${[...T].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{sensitivity:'base'})).map(t=>`<option value="${t.id}"${s.tag===t.id?'selected':''}>${esc(t.nombre)}</option>`).join('')}</select></label>`
-    +s.canciones.map(id=>{const c=C.find(x=>x.id===id);return c?`<div class="mrow"><div class="mn">${titAlb(c)}</div><button class="ic rj" data-srm="${s.id}:${id}" aria-label="Quitar">${ic('x',15)}</button></div>`:''}).join('')
+    +canciones
     +`<button class="sec" data-spick="${s.id}">${ic('pls',15)} Canci\u00f3n</button></div>`;
-  i.innerHTML=`<div class="ch2"><button class="sec" data-back>${ic('lft',16)} Repertorios</button><span class="tipochip">${rep.tipo==='evento'?'Evento':'Misa'}</span></div>
-    <div class="rhead"><label class="fl2">Nombre del repertorio<input id="rn" value="${esc(rep.nombre||'')}"></label>
+  };
+  const cabecera=editar
+    ?`<label class="fl2">Nombre del repertorio<input id="rn" value="${esc(rep.nombre||'')}"></label>
     <label class="fl2">Fecha<input type="date" id="rf" value="${esc(rep.fecha||'')}"></label>
-    <label class="chk" style="margin:2px 0"><input type="checkbox" id="ra" ${rep.acordes?'checked':''}> Mostrar acordes</label></div>`
-    +(rep.tipo==='evento'?`<button data-sadd style="width:100%;margin-top:8px">${ic('pls',16)} A\u00f1adir secci\u00f3n</button>${rep.secciones.map(secs).join('')}`:`<div class="azesc"><button class="sec" data-alet>${ico(SHF)} Elegir toda la misa al azar</button><button class="sec besc${textoEquipo(rep.escala)?' elegida':''}" data-mesc title="Elegir escala para toda la misa">${ic('usr',16)}<span>Escala</span></button></div>${textoEquipo(rep.escala)?`<div class="escsec escmisa">${ic('usr',14)}<span>${esc(textoEquipo(rep.escala))}</span><button data-mescq aria-label="Quitar escala" title="Quitar escala">${ic('x',13)}</button></div>`:''}<div class="momentos">${MOM.map(fila).join('')}</div>`);
+    <label class="chk" style="margin:2px 0"><input type="checkbox" id="ra" ${rep.acordes?'checked':''}> Mostrar acordes</label>`
+    :`<h2 style="margin:0">${esc(rep.nombre||'Sin nombre')}</h2>${rep.fecha?`<p style="color:var(--gris);margin:4px 0 0">${esc(fechaLarga(rep.fecha))}</p>`:''}`;
+  const escalaMisa=textoEquipo(rep.escala)?`<div class="escsec escmisa">${ic('usr',14)}<span>${esc(textoEquipo(rep.escala))}</span>${editar?`<button data-mescq aria-label="Quitar escala" title="Quitar escala">${ic('x',13)}</button>`:''}</div>`:'';
+  i.innerHTML=`<div class="ch2"><button class="sec" data-back>${ic('lft',16)} Repertorios</button><span class="tipochip">${rep.tipo==='evento'?'Evento':'Misa'}</span></div>
+    <div class="rhead">${cabecera}</div>`
+    +(rep.tipo==='evento'?(editar?`<button data-sadd style="width:100%;margin-top:8px">${ic('pls',16)} A\u00f1adir secci\u00f3n</button>`:'')+rep.secciones.map(secs).join('')
+      :(editar?`<div class="azesc"><button class="sec" data-alet>${ico(SHF)} Elegir toda la misa al azar</button><button class="sec besc${textoEquipo(rep.escala)?' elegida':''}" data-mesc title="Elegir escala para toda la misa">${ic('usr',16)}<span>Escala</span></button></div>`:'')+escalaMisa+`<div class="momentos">${MOM.map(fila).join('')}</div>`);
 }
 // ===================== esto se puede Borrar =====================
 // Muestra el equipo elegido (escala) en la vista previa y en el PDF.

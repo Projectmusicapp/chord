@@ -26,7 +26,7 @@
 //  Alineación y sangría son de párrafo: afectan a las líneas tocadas por la selección.
 //  Interlineado, tipo de letra y zoom son de toda la hoja.
 // =====================================================================
-import {$,esc,guardar,crear,modal} from "./base.js";
+import {$,esc,guardar,crear,modal,puedeEditarAlbum} from "./base.js";
 import {E} from "./estado.js";
 import {ix,MAY,MEN,tokensAcorde,tokensMarcado,nuevaRaiz,usaSostenidos,transponerChars} from "./musica.js";
 import {FIJAS,PROPOR,cssFuente,OKC,plano,colorOk,CT,CH,svgI,UNDO,REDO,AL_L,AL_C,AL_R,AL_J,IND,OUTD,FIND,BRUSH,MARK} from "./formato.js";
@@ -136,7 +136,7 @@ const recorta=ls=>{const o=[...ls];while(o.length>1&&!o[o.length-1].r.length)o.p
 // ---------- LA FUNCIÓN PRINCIPAL ----------
 export function abrir(s,alCerrar){
   if(ed)forzarCierre();
-  const A=E.albumes,T=E.etiquetas;   // listas de álbumes y etiquetas que usa el editor
+  const A=E.albumes.filter(puedeEditarAlbum),T=E.etiquetas;   // álbumes donde se puede mover esta canción (el suyo ya está permitido) y etiquetas
   ed={titulo:'',tono:'',tonoAct:'',etiquetas:[],acordes:{},ac:null,cc:{},intro:'',interludios:[],final:null,fuente:'',fuenteA:'',lh:0,...structuredClone(s)};
   if(!ed.tonoAct)ed.tonoAct=ed.tono;
   ed.albumId=ed.albumId||A[0]?.id;
