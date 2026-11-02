@@ -17,7 +17,7 @@ export function establecerSesion(u){
   ambitoVisto=null;   // al entrar o salir, siempre se empieza en «General»
   try{sessionStorage.removeItem('ambitoVisto')}catch(e){}
 }
-export const esNivelAdmin=()=>{const u=usuarioActual;return !!u&&(u.rol==='admin'||u.rol==='editor')};
+export const esNivelAdmin=()=>{const u=usuarioActual;return !!u&&u.rol==='admin'};
 // puedeEditar: todos los roles pueden crear/editar algo EXCEPTO «usuario» (solo ve).
 export const puedeEditar=()=>{const u=usuarioActual;return !!u&&u.rol!=='usuario'};
 
@@ -27,9 +27,11 @@ let ambitoVisto=null;
 try{ambitoVisto=sessionStorage.getItem('ambitoVisto')||null}catch(e){}
 export function ambitoActual(){
   const u=usuarioActual;if(!u)return null;
-  if(u.rol==='admin'||u.rol==='editor')return ambitoVisto;      // General, o el ministerio que están revisando
-  if(u.rol==='ministerio')return u.id;                          // su propio espacio
-  return u.ministerioId||null;                                  // editorMinisterio, usuario: el de su ministerio
+  if(u.rol==='admin')return ambitoVisto;         // General, o el ministerio que están revisando
+  // ministerio: su propio espacio, salvo que sea un «ayudante» de otro ministerio
+  // (en ese caso ministerioId apunta al espacio del equipo al que pertenece).
+  if(u.rol==='ministerio')return u.ministerioId||u.id;
+  return u.ministerioId||null;                   // usuario: el de su ministerio
 }
 // cambiarAmbito: para el selector de espacio de trabajo (solo Administrador/Editor).
 export function cambiarAmbito(id){

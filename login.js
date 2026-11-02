@@ -1,4 +1,4 @@
-// ===== LOGIN (cuentas reales en Firebase: admin, editor, ministerio, editorMinisterio, usuario) =====
+// ===== LOGIN (cuentas reales en Firebase: admin, ministerio, usuario) =====
 // Ojo: esto solo pide usuario y contraseña en pantalla. No protege los datos de Firebase.
 import {establecerSesion} from "./base.js";
 import {cargado,intentarLogin,usuarioPorId,montarSelectorAmbito,montarCambiarClave} from "./usuarios.js";

@@ -1,29 +1,33 @@
 // =====================================================================
-//  USUARIOS.JS  ·  Cuentas y permisos (3 niveles, con ministerios)
+//  USUARIOS.JS  ·  Cuentas y permisos (exactamente 3 roles, con ministerios)
 //
-//  Niveles:
-//   admin ............... control total. Puede crear Editores (con sus
-//                          mismos permisos), crear Ministerios, y ocultar
-//                          álbumes de la biblioteca general.
-//   editor .............. mismos permisos que admin (lo designa un admin).
-//   ministerio .......... un equipo/misión. Ve la biblioteca general (lo
-//                          que pone el admin) pero no la edita. Tiene su
-//                          propia biblioteca privada, calendario y escalas,
-//                          separados de los demás ministerios. Puede crear
-//                          sus propios «editorMinisterio» y «usuario», y
-//                          también otros «ministerio» nuevos (quedan
-//                          independientes, con su propio espacio: no son
-//                          sub-equipos de quien los creó).
-//   editorMinisterio .... mismos permisos que su ministerio, dentro de ese
-//                          mismo ministerio (lo designa ese ministerio).
-//   usuario ............. solo ve (de su ministerio + la biblioteca
-//                          general). No crea ni edita nada.
+//  Roles:
+//   admin ..... control total: biblioteca general, puede ocultar álbumes
+//               de la biblioteca general, y crear cuentas de cualquier
+//               rol (otros admin, ministerios, usuarios). Todas las
+//               cuentas admin tienen el mismo poder (no hay «el admin
+//               original» y «sus ayudantes»: son todas iguales).
+//   ministerio  un equipo/misión. Ve la biblioteca general (lo que pone
+//               el admin) sin poder editarla. Tiene su propia biblioteca
+//               privada, calendario, escalas y repertorio, separados de
+//               los demás ministerios. Puede crear:
+//                - otras cuentas «ministerio» para SU MISMO equipo (los
+//                  «ayudantes»: ministerioId apunta al mismo espacio),
+//                - otras cuentas «ministerio» NUEVAS e independientes
+//                  (su propio espacio nuevo, no es un sub-equipo),
+//                - cuentas «usuario» para su equipo.
+//   usuario ... solo ve (su ministerio + la biblioteca general). No crea
+//               ni edita nada.
 //
 //  Los datos de cada ministerio (álbumes propios, calendario, escalas...)
-//  se separan con el campo «ministerioId» (ver conAmbito en base.js).
-//  Un admin/editor puede «entrar» al espacio de un ministerio con el
-//  selector de la cabecera (montarSelectorAmbito) para revisarlo o
-//  ayudarle, y volver a «General» cuando quiera.
+//  se separan con el campo «ministerioId» (ver conAmbito en base.js). Una
+//  cuenta «ministerio» independiente usa su propio id como ministerioId;
+//  un «ayudante» usa el id del equipo al que pertenece (ver ambitoActual
+//  en base.js).
+//
+//  Un admin puede «entrar» al espacio de un ministerio con el selector de
+//  la cabecera (montarSelectorAmbito) para revisarlo o ayudar, y volver a
+//  «General» cuando quiera.
 //
 //  OJO: igual que el login anterior, esto no protege los datos en Firebase
 //  directamente: solo la propia app respeta estos permisos. Las claves se
@@ -31,7 +35,7 @@
 // =====================================================================
 import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,sesion,establecerSesion,esNivelAdmin,puedeEditar,ambitoActual,cambiarAmbito} from "./base.js";
 
-const ROLES={admin:'Administrador',editor:'Editor',ministerio:'Ministerio',editorMinisterio:'Editor de ministerio',usuario:'Usuario (solo ver)'};
+const ROLES={admin:'Administrador',ministerio:'Ministerio',usuario:'Usuario (solo ver)'};
 
 const st=document.createElement('style');
 st.textContent=`header .sel-ambito{margin-left:auto;margin-right:10px;max-width:160px;min-height:36px;background:#ffffff14;color:#fff;border-color:transparent}
@@ -74,12 +78,17 @@ export function usuarioPorId(id){
 }
 
 // ---------- A qué ministerio pertenecen las cuentas que crea/gestiona cada rol ----------
-const miMinisterio=u=>u.rol==='ministerio'?u.id:(u.ministerioId||null);
-const esMinisterioTier=u=>u.rol==='ministerio'||u.rol==='editorMinisterio';
+// miMinisterio: el espacio en el que trabaja esta cuenta (un ministerio independiente usa su
+// propio id; un «ayudante» usa el id del equipo al que pertenece).
+const miMinisterio=u=>u.rol==='ministerio'?(u.ministerioId||u.id):(u.ministerioId||null);
+const esMinisterioTier=u=>u.rol==='ministerio';
+// esEspacioMinisterio: ¿este doc «ministerio» ES un espacio (independiente), y no un ayudante
+// que comparte el espacio de otro? Solo estos aparecen como «ministerios» para elegir.
+const esEspacioMinisterio=u=>u.rol==='ministerio'&&(!u.ministerioId||u.ministerioId===u.id);
 
 function rolesCreables(actor){
-  if(esNivelAdmin())return [['editor','Editor (como Administrador)'],['ministerio','Ministerio (equipo nuevo e independiente)'],['editorMinisterio','Editor de un ministerio'],['usuario','Usuario (solo ver)']];
-  if(esMinisterioTier(actor))return [['ministerio','Ministerio (equipo nuevo e independiente)'],['editorMinisterio','Editor de tu ministerio'],['usuario','Usuario (solo ver)']];
+  if(esNivelAdmin())return [['admin','Administrador (como tú)'],['ministerio','Ministerio'],['usuario','Usuario (solo ver)']];
+  if(esMinisterioTier(actor))return [['ministerio','Ministerio'],['usuario','Usuario (solo ver)']];
   return [];
 }
 function cuentasVisibles(actor){
@@ -90,14 +99,14 @@ function cuentasVisibles(actor){
 function puedeGestionar(u,actor){
   if(u.id===actor.id)return false;              // su propia cuenta no se gestiona desde aquí
   if(esNivelAdmin())return true;
-  return esMinisterioTier(actor)&&(u.ministerioId||null)===miMinisterio(actor)&&u.rol!=='ministerio';
+  return esMinisterioTier(actor)&&(u.ministerioId||null)===miMinisterio(actor);
 }
 
-// ---------- Selector de espacio de trabajo (solo Administrador/Editor), en la cabecera ----------
+// ---------- Selector de espacio de trabajo (solo Administrador), en la cabecera ----------
 function pintaSelector(){
   if(!elSelect)return;
   const amb=ambitoActual()||'';
-  elSelect.innerHTML=`<option value="">General</option>`+U.filter(u=>u.rol==='ministerio').map(m=>`<option value="${m.id}">${esc(m.nombre||m.usuario)}</option>`).join('');
+  elSelect.innerHTML=`<option value="">General</option>`+U.filter(esEspacioMinisterio).map(m=>`<option value="${m.id}">${esc(m.nombre||m.usuario)}</option>`).join('');
   elSelect.value=amb;
 }
 export function montarSelectorAmbito(){
@@ -156,7 +165,7 @@ vistas.usuarios=contenedor=>{
 addEventListener('hashchange',()=>{if(location.hash!=='#usuarios')el=null});
 
 function etiquetaMinisterio(u){
-  if(!u.ministerioId)return '';
+  if(!u.ministerioId||u.ministerioId===u.id)return '';   // un ministerio independiente no «pertenece» a sí mismo
   const m=U.find(x=>x.id===u.ministerioId);
   return m?(m.nombre||m.usuario):'(ministerio eliminado)';
 }
@@ -187,7 +196,7 @@ function clic(e){
   else if(d.ed)formEditar(U.find(x=>x.id===d.ed));
   else if(d.el){
     const u=U.find(x=>x.id===d.el);if(!u)return;
-    if((u.rol==='admin'||u.rol==='editor')&&U.filter(x=>x.rol==='admin'||x.rol==='editor').length<=1)return alert('Debe quedar al menos una cuenta de Administrador o Editor.');
+    if(u.rol==='admin'&&U.filter(x=>x.rol==='admin').length<=1)return alert('Debe quedar al menos una cuenta de Administrador.');
     eliminar('usuarios',u,'la cuenta "'+(u.nombre||u.usuario)+'"');
   }
 }
@@ -196,35 +205,44 @@ function clic(e){
 function formNuevo(){
   const actor=sesion(),roles=rolesCreables(actor);
   if(!roles.length)return;
-  const necesitaMinisterio=esNivelAdmin();
-  const ministerios=U.filter(u=>u.rol==='ministerio');
+  const necesitaMinisterio=esNivelAdmin();          // admin eligiendo a qué ministerio pertenece un «usuario»
+  const necesitaTipo=esMinisterioTier(actor);       // ministerio creando otro «ministerio»: ¿nuevo o ayudante?
+  const ministerios=U.filter(esEspacioMinisterio);
   const o=modal(`<div class="mh"><h2>Nueva cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Usuario (para iniciar sesión)<input id="fu" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Contraseña<input id="fc" type="text" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Nivel<select id="fr">${roles.map(([v,t])=>`<option value="${v}">${esc(t)}</option>`).join('')}</select></label>
+    ${necesitaTipo?`<label class="fl2" id="tipow" style="margin-bottom:12px">Tipo de ministerio<select id="tipo"><option value="nuevo">Nuevo e independiente</option><option value="ayudante">Ayudante de tu equipo (tu mismo espacio)</option></select></label>`:''}
     ${necesitaMinisterio?`<label class="fl2" id="fmw" style="margin-bottom:12px">Ministerio<select id="fm">${ministerios.map(m=>`<option value="${m.id}">${esc(m.nombre||m.usuario)}</option>`).join('')||'<option value="">(crea primero un ministerio)</option>'}</select></label>`:''}
     <p class="error" role="alert" hidden></p>
     <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Crear</button></div>`);
-  const actualizaMinisterio=()=>{const w=$('#fmw',o);if(w)w.hidden=!['editorMinisterio','usuario'].includes($('#fr',o).value)};
-  if(necesitaMinisterio){actualizaMinisterio();$('#fr',o).onchange=actualizaMinisterio}
+  const actualizaCampos=()=>{
+    const rol=$('#fr',o).value;
+    const wt=$('#tipow',o);if(wt)wt.hidden=rol!=='ministerio';
+    const wm=$('#fmw',o);if(wm)wm.hidden=rol!=='usuario';
+  };
+  if(necesitaTipo||necesitaMinisterio){actualizaCampos();$('#fr',o).onchange=actualizaCampos}
   const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
   const aceptar=()=>{
     const nombre=$('#fn',o).value.trim(),usuario=$('#fu',o).value.trim(),clave=$('#fc',o).value,rol=$('#fr',o).value;
     if(!usuario||!clave)return err('Escribe usuario y contraseña.');
     if(U.some(x=>x.usuario.trim().toLowerCase()===usuario.toLowerCase()))return err('Ya existe una cuenta con ese usuario.');
-    let ministerioId=null;
-    if(rol==='ministerio'){
-      // Un ministerio nuevo siempre es un espacio propio e independiente (su ministerioId se
-      // pone después, igual a su propio id), aunque lo cree otro ministerio.
-    }else if(esMinisterioTier(actor)){
-      ministerioId=miMinisterio(actor);
-    }else if(['editorMinisterio','usuario'].includes(rol)){
-      ministerioId=$('#fm',o)?.value||'';
-      if(!ministerioId)return err('Elige a qué ministerio pertenece, o crea un ministerio primero.');
+    let ministerioId=null,independiente=false;
+    if(rol==='admin'){
+      // ministerioId queda null: todo admin es del espacio general.
+    }else if(rol==='ministerio'){
+      if(necesitaTipo&&$('#tipo',o).value==='ayudante')ministerioId=miMinisterio(actor);
+      else independiente=true;   // se le asigna su propio id después de crearse
+    }else if(rol==='usuario'){
+      if(esMinisterioTier(actor))ministerioId=miMinisterio(actor);
+      else{
+        ministerioId=$('#fm',o)?.value||'';
+        if(!ministerioId)return err('Elige a qué ministerio pertenece, o crea un ministerio primero.');
+      }
     }
     crear('usuarios',{usuario,clave,nombre:nombre||usuario,rol,ministerioId,activo:true,creadoPor:actor.id}).then(ref=>{
-      if(rol==='ministerio')guardar('usuarios',ref.id,{ministerioId:ref.id});
+      if(independiente)guardar('usuarios',ref.id,{ministerioId:ref.id});
     });
     o.remove();aviso('Cuenta creada.');
   };
