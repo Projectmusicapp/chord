@@ -12,32 +12,20 @@ export const escuchar=(col,fn)=>onSnapshot(collection(db,col),s=>fn(s.docs.map(d
 // La guarda login.js (con establecerSesion) después de validar usuario y clave contra usuarios.js.
 let usuarioActual=null;
 export const sesion=()=>usuarioActual;
-export function establecerSesion(u){
-  usuarioActual=u;
-  ambitoVisto=null;   // al entrar o salir, siempre se empieza en «General»
-  try{sessionStorage.removeItem('ambitoVisto')}catch(e){}
-}
+export function establecerSesion(u){usuarioActual=u}
 export const esNivelAdmin=()=>{const u=usuarioActual;return !!u&&u.rol==='admin'};
 // puedeEditar: todos los roles pueden crear/editar algo EXCEPTO «usuario» (solo ve).
 export const puedeEditar=()=>{const u=usuarioActual;return !!u&&u.rol!=='usuario'};
 
 // ===== ÁMBITO: el «espacio» de un ministerio (su propio calendario, escalas, canciones...) =====
-// null = el espacio general/base (el del Administrador).
-let ambitoVisto=null;
-try{ambitoVisto=sessionStorage.getItem('ambitoVisto')||null}catch(e){}
+// null = el espacio general/base (el del Administrador, que siempre trabaja ahí).
 export function ambitoActual(){
   const u=usuarioActual;if(!u)return null;
-  if(u.rol==='admin')return ambitoVisto;         // General, o el ministerio que están revisando
+  if(u.rol==='admin')return null;
   // ministerio: su propio espacio, salvo que sea un «ayudante» de otro ministerio
   // (en ese caso ministerioId apunta al espacio del equipo al que pertenece).
   if(u.rol==='ministerio')return u.ministerioId||u.id;
   return u.ministerioId||null;                   // usuario: el de su ministerio
-}
-// cambiarAmbito: para el selector de espacio de trabajo (solo Administrador/Editor).
-export function cambiarAmbito(id){
-  ambitoVisto=id||null;
-  try{sessionStorage.setItem('ambitoVisto',ambitoVisto||'')}catch(e){}
-  dispatchEvent(new Event('ambitocambio'));
 }
 const propioAmbito=d=>(d.ministerioId||null)===ambitoActual();
 // visibleBiblioteca: un álbum sin ministerioId es de la biblioteca general (de todos),
@@ -159,23 +147,20 @@ function irA(){
 }
 
 // ===== INICIO (logo, nombre y 4 botones) =====
+// Cambiar el nombre/logo de la app y la copia de seguridad viven en la pantalla Usuarios
+// (sección de administración, solo para el nivel Administrador) — ver usuarios.js.
 let cfg={nombre:'Ministerio de música',logo:''},listo=0;
+export const configActual=()=>cfg;
 const cabecera=()=>{$('#logo').innerHTML=(cfg.logo?`<img src="${cfg.logo}" alt="">`:`<span class="lg">${ic('mus',20)}</span>`)+`<span>${esc(cfg.nombre)}</span>`};
 
 const hoyLargo=()=>{const t=new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'});return t.charAt(0).toUpperCase()+t.slice(1)};
 vistas.inicio=el=>{
-  const admin=esNivelAdmin();
   el.innerHTML=`<div class="inicio">
     <div class="portada">${cfg.logo?`<img class="logo" src="${cfg.logo}" alt="Logo">`:`<div class="bigmark">${ic('mus',54)}</div>`}</div>
     <h1>${esc(cfg.nombre)}</h1>
     <p class="sub">${hoyLargo()}</p>
     <div class="menu4">${menuDe().map(([k,i,n,d])=>`<a href="#${k}"><span class="mi">${ic(i,34)}</span><span>${n}</span><small>${d}</small></a>`).join('')}</div>
-    <div class="ajustes">${admin?`<button id="bl">${ic('img',16)} Cambiar logo</button>${cfg.logo?`<button class="sec" id="bq">${ic('x',16)} Quitar logo</button>`:''}<button id="bn">${ic('edt',16)} Cambiar nombre</button><input type="file" id="fl" accept="image/*" hidden>`:''}</div>
   </div>`;
-  const bl=$('#bl');if(bl)bl.onclick=()=>$('#fl').click();
-  const fl=$('#fl');if(fl)fl.onchange=async e=>guardar('config','app',{logo:await imagen(e.target.files[0],200)});
-  const bq=$('#bq');if(bq)bq.onclick=()=>{if(confirm('¿Quitar el logo y volver al icono por defecto?'))guardar('config','app',{logo:''})};
-  const bn=$('#bn');if(bn)bn.onclick=()=>{const n=prompt('Nombre de la app',cfg.nombre);if(n)guardar('config','app',{nombre:n})};
 };
 
 escuchar('config',l=>{

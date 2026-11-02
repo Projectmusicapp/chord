@@ -25,23 +25,21 @@
 //  un «ayudante» usa el id del equipo al que pertenece (ver ambitoActual
 //  en base.js).
 //
-//  Un admin puede «entrar» al espacio de un ministerio con el selector de
-//  la cabecera (montarSelectorAmbito) para revisarlo o ayudar, y volver a
-//  «General» cuando quiera.
-//
 //  OJO: igual que el login anterior, esto no protege los datos en Firebase
 //  directamente: solo la propia app respeta estos permisos. Las claves se
 //  guardan tal cual, sin cifrar.
 // =====================================================================
-import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,sesion,establecerSesion,esNivelAdmin,puedeEditar,ambitoActual,cambiarAmbito} from "./base.js";
+import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,puedeEditar,configActual} from "./base.js";
+import {ventana as abrirRespaldo} from "./respaldo.js";
 
 const ROLES={admin:'Administrador',ministerio:'Ministerio',usuario:'Usuario (solo ver)'};
 
 const st=document.createElement('style');
-st.textContent=`header .sel-ambito{margin-left:auto;margin-right:10px;max-width:160px;min-height:36px;background:#ffffff14;color:#fff;border-color:transparent}
-header .btn-clave{margin-left:auto;margin-right:8px;background:#ffffff14;color:#DDE3F5;min-height:36px;padding:6px 12px;font-size:14px;flex:none;display:inline-flex;align-items:center;gap:6px}
-header .btn-clave:hover{background:#ffffff26;filter:none}
-@media(max-width:480px){header .btn-clave span{display:none}header .btn-clave{width:40px;padding:0;justify-content:center}}
+st.textContent=`header .btn-cuenta{margin-left:auto;margin-right:8px;background:#ffffff14;color:#DDE3F5;min-height:36px;padding:6px 12px;font-size:14px;flex:none;display:inline-flex;align-items:center;gap:6px}
+header .btn-cuenta:hover{background:#ffffff26;filter:none}
+@media(max-width:480px){header .btn-cuenta span{display:none}header .btn-cuenta{width:40px;padding:0;justify-content:center}}
+[data-vista=usuarios] .config{background:var(--capa);border-radius:var(--r-m);padding:14px;margin-bottom:18px;display:flex;flex-direction:column;gap:10px}
+[data-vista=usuarios] .config .mb2{margin:0}
 [data-vista=usuarios] .ulist{display:grid;gap:8px;margin-top:14px}
 [data-vista=usuarios] .ufila{display:flex;align-items:center;gap:12px;background:var(--capa);border-radius:var(--r-m);padding:10px 12px;flex-wrap:wrap}
 [data-vista=usuarios] .ufila .un{flex:1;min-width:160px}
@@ -52,7 +50,7 @@ header .btn-clave:hover{background:#ffffff26;filter:none}
 [data-vista=usuarios] .mb2{display:flex;gap:6px;flex-wrap:wrap}`;
 document.head.append(st);
 
-let U=[],listo=false,elSelect=null,el=null;
+let U=[],listo=false,el=null;
 const esperando=[];
 export const cargado=()=>listo?Promise.resolve():new Promise(r=>esperando.push(r));
 
@@ -64,7 +62,6 @@ escuchar('usuarios',l=>{
     return;   // se espera el siguiente aviso de Firebase, ya con esta cuenta creada
   }
   if(!listo){listo=true;esperando.forEach(r=>r());esperando.length=0}
-  pintaSelector();
   if(el)pintar();
 });
 
@@ -102,55 +99,40 @@ function puedeGestionar(u,actor){
   return esMinisterioTier(actor)&&(u.ministerioId||null)===miMinisterio(actor);
 }
 
-// ---------- Selector de espacio de trabajo (solo Administrador), en la cabecera ----------
-function pintaSelector(){
-  if(!elSelect)return;
-  const amb=ambitoActual()||'';
-  elSelect.innerHTML=`<option value="">General</option>`+U.filter(esEspacioMinisterio).map(m=>`<option value="${m.id}">${esc(m.nombre||m.usuario)}</option>`).join('');
-  elSelect.value=amb;
-}
-export function montarSelectorAmbito(){
-  if(!esNivelAdmin())return;
+// ---------- Mi cuenta (cualquier rol): datos propios, ministerio al que pertenece y contraseña ----------
+export function montarMiCuenta(){
   const header=document.querySelector('header');
-  if(!header||elSelect)return;
-  elSelect=document.createElement('select');
-  elSelect.className='sel-ambito';
-  elSelect.title='Espacio de trabajo';
-  elSelect.setAttribute('aria-label','Espacio de trabajo');
-  elSelect.onchange=()=>cambiarAmbito(elSelect.value||null);
-  pintaSelector();
-  const salir=header.querySelector('.salir');
-  if(salir)header.insertBefore(elSelect,salir);else header.append(elSelect);
-}
-
-// ---------- Cambiar mi contraseña (cualquier cuenta, incluido el rol «usuario») ----------
-export function montarCambiarClave(){
-  const header=document.querySelector('header');
-  if(!header||!sesion()||header.querySelector('.btn-clave'))return;
+  if(!header||!sesion()||header.querySelector('.btn-cuenta'))return;
   const b=document.createElement('button');
-  b.className='btn-clave';
-  b.title='Cambiar mi contraseña';
-  b.setAttribute('aria-label','Cambiar mi contraseña');
-  b.innerHTML=ic('edt',16)+'<span>Contraseña</span>';
-  b.onclick=formMiClave;
+  b.className='btn-cuenta';
+  b.title='Mi cuenta';
+  b.setAttribute('aria-label','Mi cuenta');
+  b.innerHTML=ic('usr',16)+'<span>Mi cuenta</span>';
+  b.onclick=formMiCuenta;
   const salir=header.querySelector('.salir');
   if(salir)header.insertBefore(b,salir);else header.append(b);
 }
-function formMiClave(){
+function formMiCuenta(){
   const actor=sesion();if(!actor)return;
-  const o=modal(`<div class="mh"><h2>Cambiar mi contraseña</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
-    <p style="margin-top:0;color:var(--gris)">Cuenta: <b>${esc(actor.usuario)}</b></p>
-    <label class="fl2" style="margin-bottom:12px">Nueva contraseña<input id="fc1" type="password" autocomplete="new-password"></label>
+  const mision=actor.ministerioId&&actor.ministerioId!==actor.id?etiquetaMinisterio(actor):'';
+  const o=modal(`<div class="mh"><h2>Mi cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
+    ${mision?`<p style="margin-top:0;color:var(--gris)">Misión a la que perteneces: <b>${esc(mision)}</b></p>`:''}
+    <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" value="${esc(actor.nombre||'')}" autocomplete="off"></label>
+    <label class="fl2" style="margin-bottom:12px">Correo<input id="fe" type="email" value="${esc(actor.correo||'')}" autocomplete="off"></label>
+    <label class="fl2" style="margin-bottom:12px">Usuario<input id="fu" value="${esc(actor.usuario)}" disabled></label>
+    <label class="fl2" style="margin-bottom:12px">Nueva contraseña (vacío = no cambiar)<input id="fc1" type="password" autocomplete="new-password"></label>
     <label class="fl2" style="margin-bottom:12px">Repetir contraseña<input id="fc2" type="password" autocomplete="new-password"></label>
     <p class="error" role="alert" hidden></p>
     <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Guardar</button></div>`);
   const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
   const aceptar=()=>{
-    const c1=$('#fc1',o).value,c2=$('#fc2',o).value;
-    if(!c1)return err('Escribe una contraseña.');
-    if(c1!==c2)return err('Las contraseñas no coinciden.');
-    guardar('usuarios',actor.id,{clave:c1});
-    o.remove();aviso('Contraseña actualizada.');
+    const nombre=$('#fn',o).value.trim(),correo=$('#fe',o).value.trim(),c1=$('#fc1',o).value,c2=$('#fc2',o).value;
+    if(c1&&c1!==c2)return err('Las contraseñas no coinciden.');
+    const cambios={nombre:nombre||actor.usuario,correo};
+    if(c1)cambios.clave=c1;
+    guardar('usuarios',actor.id,cambios);
+    establecerSesion({...actor,...cambios});
+    o.remove();aviso('Datos actualizados.');
   };
   o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.id==='ok')aceptar()};
   o.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();aceptar()}};
@@ -174,9 +156,21 @@ function pintar(){
   if(!el)return;
   const actor=sesion();if(!actor)return;
   const lista=cuentasVisibles(actor).slice().sort((a,b)=>(a.nombre||a.usuario).localeCompare(b.nombre||b.usuario,'es'));
+  const admin=esNivelAdmin(),cfg=configActual();
+  const config=admin?`<div class="config"><h2 style="margin:0">Administración</h2>
+      <div class="mb2"><button id="bl">${ic('img',16)} Cambiar logo</button>${cfg.logo?`<button class="sec" id="bq">${ic('x',16)} Quitar logo</button>`:''}<button id="bn">${ic('edt',16)} Cambiar nombre</button><button class="sec" id="br">${ic('cfg',16)} Copia de seguridad</button><input type="file" id="fl" accept="image/*" hidden></div>
+    </div>`:'';
   el.innerHTML=`<div class="ch2"><h1>Usuarios</h1><button id="nu">${ic('pls',16)} Nueva cuenta</button></div>
+    ${config}
     <div class="ulist">${lista.map(u=>fila(u,actor)).join('')||'<p class="vacio">Aún no hay cuentas aquí.</p>'}</div>`;
   el.onclick=clic;
+  if(admin){
+    const bl=$('#bl',el);if(bl)bl.onclick=()=>$('#fl',el).click();
+    const fl=$('#fl',el);if(fl)fl.onchange=async e=>guardar('config','app',{logo:await imagen(e.target.files[0],200)});
+    const bq=$('#bq',el);if(bq)bq.onclick=()=>{if(confirm('¿Quitar el logo y volver al icono por defecto?'))guardar('config','app',{logo:''})};
+    const bn=$('#bn',el);if(bn)bn.onclick=()=>{const n=prompt('Nombre de la app',cfg.nombre);if(n)guardar('config','app',{nombre:n})};
+    const br=$('#br',el);if(br)br.onclick=abrirRespaldo;
+  }
 }
 
 function fila(u,actor){
@@ -255,7 +249,7 @@ function formEditar(u){
   const o=modal(`<div class="mh"><h2>Editar cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" value="${esc(u.nombre||'')}" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Usuario<input id="fu" value="${esc(u.usuario)}" autocomplete="off"></label>
-    <p style="margin:0 0 12px;color:var(--gris);font-size:13.5px">La contraseña solo la cambia cada cuenta desde el botón «Contraseña» de su propia sesión.</p>
+    <p style="margin:0 0 12px;color:var(--gris);font-size:13.5px">La contraseña solo la cambia cada cuenta desde el botón «Mi cuenta» de su propia sesión.</p>
     <label class="chk" style="margin:2px 0 14px"><input type="checkbox" id="fa" ${u.activo===false?'':'checked'}> Cuenta activa (puede iniciar sesión)</label>
     <p class="error" role="alert" hidden></p>
     <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Guardar</button></div>`);
