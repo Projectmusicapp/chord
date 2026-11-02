@@ -169,7 +169,7 @@ vistas.inicio=el=>{
     <div class="portada">${cfg.logo?`<img class="logo" src="${cfg.logo}" alt="Logo">`:`<div class="bigmark">${ic('mus',54)}</div>`}</div>
     <h1>${esc(cfg.nombre)}</h1>
     <p class="sub">${hoyLargo()}</p>
-    <div class="menu4">${menuDe().filter(x=>x[0]!=='usuarios').map(([k,i,n,d])=>`<a href="#${k}"><span class="mi">${ic(i,34)}</span><span>${n}</span><small>${d}</small></a>`).join('')}</div>
+    <div class="menu4">${menuDe().map(([k,i,n,d])=>`<a href="#${k}"><span class="mi">${ic(i,34)}</span><span>${n}</span><small>${d}</small></a>`).join('')}</div>
     <div class="ajustes">${admin?`<button id="bl">${ic('img',16)} Cambiar logo</button><button id="bn">${ic('edt',16)} Cambiar nombre</button><input type="file" id="fl" accept="image/*" hidden>`:''}</div>
   </div>`;
   const bl=$('#bl');if(bl)bl.onclick=()=>$('#fl').click();
