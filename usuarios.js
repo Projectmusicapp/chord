@@ -124,37 +124,38 @@ export function montarMenuUsuario(salir){
   const cerrar=()=>{dd.hidden=true;boton.setAttribute('aria-expanded','false')};
   boton.onclick=()=>{const abrir=dd.hidden;dd.hidden=!abrir;boton.setAttribute('aria-expanded',String(abrir))};
   document.addEventListener('click',e=>{if(!dd.hidden&&!cont.contains(e.target))cerrar()});
-  cont.querySelector('[data-mc]').onclick=()=>{cerrar();formMiCuenta()};
+  cont.querySelector('[data-mc]').onclick=()=>{cerrar();location.hash='cuenta'};
   const cfgBtn=cont.querySelector('[data-cfg]');if(cfgBtn)cfgBtn.onclick=()=>{cerrar();location.hash='usuarios'};
   cont.querySelector('[data-sal]').onclick=()=>{cerrar();salir()};
   header.append(cont);
 }
-function formMiCuenta(){
+
+// ---------- Pantalla «Mi cuenta» (cualquier rol): datos propios y contraseña ----------
+vistas.cuenta=contenedor=>{
   const actor=sesion();if(!actor)return;
   const mision=actor.ministerioId&&actor.ministerioId!==actor.id?etiquetaMinisterio(actor):'';
-  const o=modal(`<div class="mh"><h2>Mi cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
-    ${mision?`<p style="margin-top:0;color:var(--gris)">Misión a la que perteneces: <b>${esc(mision)}</b></p>`:''}
+  contenedor.innerHTML=`<div class="ch2"><h1>Mi cuenta</h1></div>
+    ${mision?`<p style="color:var(--gris)">Misión a la que perteneces: <b>${esc(mision)}</b></p>`:''}
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" value="${esc(actor.nombre||'')}" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Correo<input id="fe" type="email" value="${esc(actor.correo||'')}" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Usuario<input id="fu" value="${esc(actor.usuario)}" disabled></label>
     <label class="fl2" style="margin-bottom:12px">Nueva contraseña (vacío = no cambiar)<input id="fc1" type="password" autocomplete="new-password"></label>
     <label class="fl2" style="margin-bottom:12px">Repetir contraseña<input id="fc2" type="password" autocomplete="new-password"></label>
     <p class="error" role="alert" hidden></p>
-    <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Guardar</button></div>`);
-  const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
-  const aceptar=()=>{
-    const nombre=$('#fn',o).value.trim(),correo=$('#fe',o).value.trim(),c1=$('#fc1',o).value,c2=$('#fc2',o).value;
+    <button id="ok">Guardar</button>`;
+  const err=t=>{const p=$('.error',contenedor);p.textContent=t;p.hidden=!t};
+  contenedor.onclick=e=>{
+    if(!e.target.closest('#ok'))return;
+    const nombre=$('#fn',contenedor).value.trim(),correo=$('#fe',contenedor).value.trim(),c1=$('#fc1',contenedor).value,c2=$('#fc2',contenedor).value;
     if(c1&&c1!==c2)return err('Las contraseñas no coinciden.');
     const cambios={nombre:nombre||actor.usuario,correo};
     if(c1)cambios.clave=c1;
     guardar('usuarios',actor.id,cambios);
     establecerSesion({...actor,...cambios});
     document.querySelectorAll('.menu-usuario .btn-usuario span,.menu-usuario .dd-usuario .nombre').forEach(elx=>elx.textContent=cambios.nombre);
-    o.remove();aviso('Datos actualizados.');
+    aviso('Datos actualizados.');
   };
-  o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.id==='ok')aceptar()};
-  o.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();aceptar()}};
-}
+};
 
 // ---------- Pantalla «Usuarios» ----------
 vistas.usuarios=contenedor=>{
@@ -178,7 +179,7 @@ function pintar(){
   const config=admin?`<div class="config"><h2 style="margin:0">Administración</h2>
       <div class="mb2"><button id="bl">${ic('img',16)} Cambiar logo</button>${cfg.logo?`<button class="sec" id="bq">${ic('x',16)} Quitar logo</button>`:''}<button id="bn">${ic('edt',16)} Cambiar nombre</button><button class="sec" id="br">${ic('cfg',16)} Copia de seguridad</button><input type="file" id="fl" accept="image/*" hidden></div>
     </div>`:'';
-  el.innerHTML=`<div class="ch2"><h1>Usuarios</h1><button id="nu">${ic('pls',16)} Nueva cuenta</button></div>
+  el.innerHTML=`<div class="ch2"><h1>Usuarios</h1><button data-nu>${ic('pls',16)} Nueva cuenta</button></div>
     ${config}
     <div class="ulist">${lista.map(u=>fila(u,actor)).join('')||'<p class="vacio">Aún no hay cuentas aquí.</p>'}</div>`;
   el.onclick=clic;

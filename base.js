@@ -132,6 +132,7 @@ export const appCargada=()=>{todoCargado=true};
 function irA(){
   const v=vista(),ver=v.startsWith('ver/');            // «ver/ID» = ventana Compartir de un repertorio
   if(!listo&&!ver)return;                               // espera el nombre y el logo guardados (así no aparece el nombre por defecto y luego cambia)
+  if(!sesion()&&!ver)return;                            // sin sesión: login.js controla la pantalla, aquí no se toca el menú ni #app
   document.body.classList.toggle('modo-ver',ver);
   const menu=menuDe();
   $('#nav').innerHTML=ver?'':menu.map(([k,i,n])=>`<a href="#${k}" class="${k===v?'on':''}" ${k===v?'aria-current="page"':''}>${ic(i,18)}<span>${n}</span></a>`).join('');
