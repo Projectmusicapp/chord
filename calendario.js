@@ -1,5 +1,5 @@
 // ===== PANTALLA: CALENDARIO (mes + panel de detalles del día) =====
-import {$,esc,guardar,crear,escuchar,eliminar,vistas,ic,modal} from "./base.js";
+import {$,esc,guardar,crear,eliminar,vistas,ic,modal,escucharPropio,puedeEditar,ambitoActual} from "./base.js";
 
 const st=document.createElement('style');
 st.textContent=`.cols{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}
@@ -50,13 +50,18 @@ const NCOL={'#1F6FEB':'Azul','#2E7D32':'Verde','#7B1FA2':'Morado','#D9822B':'Nar
 const MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const DIA=['Domingo','Lunes','Martes','Mi\u00e9rcoles','Jueves','Viernes','S\u00e1bado'],DCORTO=['Dom','Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b'];
 const dos=n=>String(n).padStart(2,'0'),ymd=d=>d.getFullYear()+'-'+dos(d.getMonth()+1)+'-'+dos(d.getDate());
+// El id del documento «dias» tiene que ser distinto por ministerio (si no, dos ministerios que
+// resaltan la misma fecha se pisarían el mismo documento). En el espacio General se deja igual
+// que antes (solo la fecha) para no romper lo que ya existía.
+const idDia=f=>{const a=ambitoActual();return a?a+'_'+f:f};
+const diaDe=(lista,f)=>lista.find(x=>(x.fecha||x.id)===f);
 let E=[],D=[],R=[],el=null,mes=new Date(),sel=ymd(new Date()),form=null;
 mes.setDate(1);
 const pill=e=>`<span class="p" style="background:${e.color}" aria-hidden="true">${esc(e.titulo)}</span>`;
 
-escuchar('eventos',l=>{E=l;pCal();if(!form)pPan()});
-escuchar('dias',l=>{D=l;pCal();if(!form)pPan()});
-escuchar('repertorios',l=>{R=l;pCal();if(!form)pPan()});   // los llena la Parte 3
+escucharPropio('eventos',l=>{E=l;pCal();if(!form)pPan()});
+escucharPropio('dias',l=>{D=l;pCal();if(!form)pPan()});
+escucharPropio('repertorios',l=>{R=l;pCal();if(!form)pPan()});   // los llena la Parte 3
 vistas.calendario=e=>{
   el=e;form=null;sel=ymd(new Date());mes=new Date();mes.setDate(1);
   el.innerHTML='<div class="cols"><section class="c2" id="cal" aria-label="Calendario del mes"></section><aside class="c2 pan" id="pan" aria-live="polite"></aside></div>';
@@ -70,7 +75,7 @@ function pCal(){
   let h=`<div class="chd"><h1 class="mt" aria-live="polite">${MES[m]} ${y}</h1><div class="bt"><button class="ic" data-nav="-1" aria-label="Mes anterior">${ic('lft')}</button><button class="ic w" data-nav="0">Hoy</button><button class="ic" data-nav="1" aria-label="Mes siguiente">${ic('rgt')}</button></div></div><div class="cal">`
     +DCORTO.map((x,i)=>`<div class="w"><abbr title="${DIA[i]}" style="text-decoration:none">${x}</abbr></div>`).join('')+'<div></div>'.repeat(ini);
   for(let d=1;d<=n;d++){
-    const f=y+'-'+dos(m+1)+'-'+dos(d),hl=D.find(x=>x.id===f),evs=E.filter(e=>e.fecha===f).sort((a,b)=>(a.hora||'').localeCompare(b.hora||'')),rs=R.filter(r=>r.fecha===f);
+    const f=y+'-'+dos(m+1)+'-'+dos(d),hl=diaDe(D,f),evs=E.filter(e=>e.fecha===f).sort((a,b)=>(a.hora||'').localeCompare(b.hora||'')),rs=R.filter(r=>r.fecha===f);
     const etiqueta=DIA[new Date(y,m,d).getDay()]+' '+d+' de '+MES[m]+(evs.length?', '+evs.length+(evs.length>1?' eventos':' evento'):'')+(rs.length?', '+rs.length+(rs.length>1?' repertorios':' repertorio'):'');
     h+=`<button class="d${f===hoy?' hoy':''}${f===sel?' sel':''}" data-dia="${f}" aria-label="${esc(etiqueta)}" aria-pressed="${f===sel}" ${f===hoy?'aria-current="date"':''} ${hl?`style="background:${hl.color}33"`:''}><b>${d}</b>`
       +evs.slice(0,2).map(pill).join('')+(evs.length>2?`<small>+${evs.length-2} m\u00e1s</small>`:'')
@@ -82,13 +87,14 @@ function pCal(){
 function pPan(){
   if(!el||!$('#pan'))return;
   const [Y,M,Dd]=sel.split('-').map(Number),dt=new Date(Y,M-1,Dd),hoy=sel===ymd(new Date());
-  const evs=E.filter(e=>e.fecha===sel).sort((a,b)=>(a.hora||'').localeCompare(b.hora||'')),hl=D.find(x=>x.id===sel);
+  const evs=E.filter(e=>e.fecha===sel).sort((a,b)=>(a.hora||'').localeCompare(b.hora||'')),hl=diaDe(D,sel);
   const deEventos=new Set(evs.map(e=>e.repertorioId).filter(Boolean));
   const rs=R.filter(r=>r.fecha===sel&&!deEventos.has(r.id));   // repertorios del día que no pertenecen a un evento (se muestran como antes)
+  const editar=puedeEditar();
   // repEv: el botón de repertorio de cada evento (abre el suyo o permite crear/elegir uno)
   const repEv=e=>{const r=e.repertorioId&&R.find(x=>x.id===e.repertorioId);
-    return r?`<div class="evr"><button class="evrep" data-rep="${r.id}" title="Abrir repertorio">${ic('mus',14)}<span>${esc(r.nombre||'Repertorio')}</span></button><button class="ic evq" data-erq="${e.id}" aria-label="Quitar el repertorio de \u00ab${esc(e.titulo)}\u00bb" title="Quitar repertorio del evento">${ic('x',14)}</button></div>`
-      :`<button class="evrep nuevo" data-erp="${e.id}">${ic('pls',14)}<span>Repertorio</span></button>`};
+    return r?`<div class="evr"><button class="evrep" data-rep="${r.id}" title="Abrir repertorio">${ic('mus',14)}<span>${esc(r.nombre||'Repertorio')}</span></button>${editar?`<button class="ic evq" data-erq="${e.id}" aria-label="Quitar el repertorio de \u00ab${esc(e.titulo)}\u00bb" title="Quitar repertorio del evento">${ic('x',14)}</button>`:''}</div>`
+      :(editar?`<button class="evrep nuevo" data-erp="${e.id}">${ic('pls',14)}<span>Repertorio</span></button>`:'')};
   let h=`<div class="fecha"><h2>${DIA[dt.getDay()]} ${Dd}${hoy?'<span class="hoyb">Hoy</span>':''}</h2><small>${MES[M-1]} de ${Y}</small></div>`;
   if(form){
     h+=`<div class="fev"><h3 style="margin:0">${form.id?'Editar evento':'Nuevo evento'}</h3>
@@ -97,12 +103,12 @@ function pPan(){
       <div class="fl2">Color<div class="colores" role="group" aria-label="Color del evento">${COL.map(c=>`<button class="sw${c===form.color?' on':''}" data-fc="${c}" style="background:${c}" aria-label="${NCOL[c]}" aria-pressed="${c===form.color}" title="${NCOL[c]}"></button>`).join('')}</div></div>
       <div class="pie"><button class="sec" data-no>Cancelar</button><button data-ok>${form.id?'Guardar cambios':'Guardar evento'}</button></div></div>`;
   }else{
-    h+=(evs.map(e=>`<div class="ev"><span class="bar" style="background:${e.color}"></span><div class="t"><b>${esc(e.titulo)}</b>${e.hora?`<span class="hora">${esc(e.hora)}</span>`:''}${e.notas?`<small>${esc(e.notas)}</small>`:''}${repEv(e)}</div><button class="ic" data-e="${e.id}" aria-label="Editar \u00ab${esc(e.titulo)}\u00bb" title="Editar">${ic('edt',16)}</button><button class="ic rj" data-x="${e.id}" aria-label="Eliminar \u00ab${esc(e.titulo)}\u00bb" title="Eliminar">${ic('trs',16)}</button></div>`).join('')||'<p class="vac" style="margin:0">No hay eventos este d\u00eda.</p>')
+    h+=(evs.map(e=>`<div class="ev"><span class="bar" style="background:${e.color}"></span><div class="t"><b>${esc(e.titulo)}</b>${e.hora?`<span class="hora">${esc(e.hora)}</span>`:''}${e.notas?`<small>${esc(e.notas)}</small>`:''}${repEv(e)}</div>${editar?`<button class="ic" data-e="${e.id}" aria-label="Editar \u00ab${esc(e.titulo)}\u00bb" title="Editar">${ic('edt',16)}</button><button class="ic rj" data-x="${e.id}" aria-label="Eliminar \u00ab${esc(e.titulo)}\u00bb" title="Eliminar">${ic('trs',16)}</button>`:''}</div>`).join('')||'<p class="vac" style="margin:0">No hay eventos este d\u00eda.</p>')
       +rs.map(r=>`<div class="ev rp"><div class="t" style="display:flex;align-items:center;gap:10px;font-weight:700;color:var(--azul)">${ic('mus',18)} ${esc(r.nombre)}</div><button data-rep="${r.id}">Abrir</button></div>`).join('')
-      +`<button data-add>${ic('pls',16)} A\u00f1adir evento</button>
+      +(editar?`<button data-add>${ic('pls',16)} A\u00f1adir evento</button>
       <button class="sec" data-rd>${ic('mus',16)} Crear repertorio para este d\u00eda</button>
       <div class="linea"></div>
-      <div class="resaltar"><span id="rl">Resaltar d\u00eda</span><div class="colores" role="group" aria-labelledby="rl">${COL.map(c=>`<button class="sw${hl&&hl.color===c?' on':''}" data-sw="${c}" style="background:${c}" aria-label="${NCOL[c]}" aria-pressed="${!!(hl&&hl.color===c)}" title="${NCOL[c]}"></button>`).join('')}</div>${hl?'<button class="lnk" data-hq>Quitar</button>':''}</div>`;
+      <div class="resaltar"><span id="rl">Resaltar d\u00eda</span><div class="colores" role="group" aria-labelledby="rl">${COL.map(c=>`<button class="sw${hl&&hl.color===c?' on':''}" data-sw="${c}" style="background:${c}" aria-label="${NCOL[c]}" aria-pressed="${!!(hl&&hl.color===c)}" title="${NCOL[c]}"></button>`).join('')}</div>${hl?'<button class="lnk" data-hq>Quitar</button>':''}</div>`:'');
   }
   $('#pan').innerHTML=h;
 }
@@ -122,8 +128,8 @@ function clic(e){
     const v={titulo:form.titulo.trim(),hora:form.hora||'',color:form.color,notas:form.notas||'',fecha:sel};
     form.id?guardar('eventos',form.id,v):crear('eventos',v);form=null;pPan();
   }
-  else if(d.sw)guardar('dias',sel,{color:d.sw});
-  else if(d.hq!=null)eliminar('dias',D.find(x=>x.id===sel),'el resaltado');
+  else if(d.sw)guardar('dias',idDia(sel),{color:d.sw,fecha:sel});
+  else if(d.hq!=null)eliminar('dias',diaDe(D,sel),'el resaltado');
   else if(d.rep){sessionStorage.setItem('repAbrir',d.rep);location.hash='repertorio'}
   else if(d.rd!=null)ventanaRepertorio(null);
   else if(d.erp)ventanaRepertorio(E.find(x=>x.id===d.erp));

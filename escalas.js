@@ -1,5 +1,5 @@
 // ===== PANTALLA: ESCALAS (personas, equipos por día, modo edición) =====
-import {$,esc,guardar,crear,escuchar,eliminar,vistas,ic,modal} from "./base.js";
+import {$,esc,guardar,crear,eliminar,vistas,ic,modal,escucharPropio,puedeEditar} from "./base.js";
 
 const st=document.createElement('style');
 st.textContent=`[data-vista=escalas] .c2{margin-bottom:22px}
@@ -66,15 +66,15 @@ const ordenarMiembros=(miembrosIds)=>{
   });
 };
 
-escuchar('personas',l=>{
+escucharPropio('personas',l=>{
   P=ordenarPersonas(l);
   pintar();
   pMan();
 });
 
-escuchar('escalas',l=>{
+escucharPropio('escalas',l=>{
   X=l.sort((a,b)=>(a.orden||0)-(b.orden||0));
-  if(!l.length)[['sabado','S\u00e1bado'],['domingo','Domingo']].forEach(([id,n],o)=>guardar('escalas',id,{nombre:n,orden:o,equipos:equipos()}));
+  if(!l.length)['S\u00e1bado','Domingo'].forEach((n,o)=>crear('escalas',{nombre:n,orden:o,equipos:equipos()}));   // id autom\u00e1tico: con varios ministerios no puede ser un id fijo compartido
   pintar();
 });
 
@@ -89,6 +89,7 @@ function pintar(){
   const popPrev=el.querySelector('.pop');
   const scrollTop=popPrev?popPrev.scrollTop:0;
   const act=document.activeElement,foco=act&&act.dataset&&act.dataset.pk?act.dataset.pk+'|'+act.value:null;   // casilla que tenía el cursor
+  const editar=puedeEditar();
 
   const dias=X.map(d=>`<div class="dia"><div class="dh">${edit?`<input class="inl" data-dn="${d.id}" value="${esc(d.nombre)}">`:`<h3>${esc(d.nombre)}</h3>`}`
     +(edit?`<button class="sec" data-ea="${d.id}">${ic('pls',15)} Equipo</button><button class="ic rj" data-dx="${d.id}" aria-label="Eliminar el d\u00eda ${esc(d.nombre)}" title="Eliminar d\u00eda">${ic('trs',16)}</button>`:'')+'</div><div class="eq">'
@@ -97,13 +98,14 @@ function pintar(){
       const miembrosOrdenados=ordenarMiembros(q.miembros);
       const n=q.miembros.filter(m=>P.some(x=>x.id===m)).length;
       return `<div class="tm"><div class="th">${edit?`<input class="inl" data-en="${k}" value="${esc(q.nombre)}" aria-label="Nombre del equipo"><button class="ic rj" data-ex="${k}" aria-label="Eliminar ${esc(q.nombre)}" title="Eliminar equipo">${ic('trs',15)}</button>`:`<b>${esc(q.nombre)}</b>${n?`<span class="cuenta">${n}</span>`:''}`}</div>`
-        +`<button class="mem" data-el="${k}" aria-expanded="${abre===k}" aria-label="${esc(q.nombre)} de ${esc(d.nombre)}: ${n?n+(n>1?' personas. Cambiar':' persona. Cambiar'):'elegir personas'}">${miembrosOrdenados.map(m=>{const p=P.find(x=>x.id===m);return p?`<span class="mrow"><span>${esc(p.nombre)}</span><small>${esc(p.ocupacion||'')}</small></span>`:''}).join('')||`<em>${ic('pls',15)} Elegir personas</em>`}</button>`
-        +(abre===k?`<div class="pop">${P.map(p=>`<label><input type="checkbox" data-pk="${k}" value="${p.id}" ${q.miembros.includes(p.id)?'checked':''}> ${esc(p.nombre)} <small>${esc(p.ocupacion||'')}</small></label>`).join('')||'<p class="vac">Primero a\u00f1ade personas con el bot\u00f3n \u00abGestionar\u00bb.</p>'}<button data-cl style="margin-top:6px;">Listo</button></div>`:'')+'</div>';
+        +(editar?`<button class="mem" data-el="${k}" aria-expanded="${abre===k}" aria-label="${esc(q.nombre)} de ${esc(d.nombre)}: ${n?n+(n>1?' personas. Cambiar':' persona. Cambiar'):'elegir personas'}">${miembrosOrdenados.map(m=>{const p=P.find(x=>x.id===m);return p?`<span class="mrow"><span>${esc(p.nombre)}</span><small>${esc(p.ocupacion||'')}</small></span>`:''}).join('')||`<em>${ic('pls',15)} Elegir personas</em>`}</button>`
+          :`<div class="mem" style="cursor:default">${miembrosOrdenados.map(m=>{const p=P.find(x=>x.id===m);return p?`<span class="mrow"><span>${esc(p.nombre)}</span><small>${esc(p.ocupacion||'')}</small></span>`:''}).join('')||'<em>Sin personas asignadas</em>'}</div>`)
+        +(editar&&abre===k?`<div class="pop">${P.map(p=>`<label><input type="checkbox" data-pk="${k}" value="${p.id}" ${q.miembros.includes(p.id)?'checked':''}> ${esc(p.nombre)} <small>${esc(p.ocupacion||'')}</small></label>`).join('')||'<p class="vac">Primero a\u00f1ade personas con el bot\u00f3n \u00abGestionar\u00bb.</p>'}<button data-cl style="margin-top:6px;">Listo</button></div>`:'')+'</div>';
     }).join('')+'</div></div>').join('');
 
   // Secciones ordenadas: Personas ARRIBA, Escalas por d\u00eda ABAJO
-  el.innerHTML=`<section class="c2"><div class="ch2"><h1 style="font-size:26px">Escalas</h1><div class="mb"><button class="${edit?'':'sec'}" id="ed" aria-pressed="${edit}">${edit?'Listo':ic('edt',16)+' Editar'}</button><button id="da">${ic('pls',16)} A\u00f1adir d\u00eda</button></div></div>${dias||'<p class="vac">A\u00fan no hay d\u00edas. Pulsa \u00abA\u00f1adir d\u00eda\u00bb.</p>'}</section>`
-  +`<section class="c2"><div class="ch2"><h2>Personas</h2><button class="sec" id="gp">${ic('usr',16)} Gestionar personas</button></div><div class="pgrid">`
+  el.innerHTML=`<section class="c2"><div class="ch2"><h1 style="font-size:26px">Escalas</h1><div class="mb">${editar?`<button class="${edit?'':'sec'}" id="ed" aria-pressed="${edit}">${edit?'Listo':ic('edt',16)+' Editar'}</button><button id="da">${ic('pls',16)} A\u00f1adir d\u00eda</button>`:''}</div></div>${dias||'<p class="vac">A\u00fan no hay d\u00edas.</p>'}</section>`
+  +`<section class="c2"><div class="ch2"><h2>Personas</h2>${editar?`<button class="sec" id="gp">${ic('usr',16)} Gestionar personas</button>`:''}</div><div class="pgrid">`
     +(P.map(p=>`<div class="per"><span class="av${(p.ocupacion||'').toLowerCase().includes('voz')?' voz':''}" aria-hidden="true">${esc(ini(p.nombre))}</span><div><b>${esc(p.nombre)}</b><small>${esc(p.ocupacion||'Sin ocupaci\u00f3n')}</small></div></div>`).join('')||'<p class="vac">A\u00fan no hay personas. Pulsa \u00abGestionar personas\u00bb para a\u00f1adirlas.</p>')
     +`</div></section>`;
 

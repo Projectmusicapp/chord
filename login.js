@@ -1,14 +1,14 @@
-// ===== LOGIN SENCILLO (un solo usuario) =====
+// ===== LOGIN (cuentas reales en Firebase: admin, editor, ministerio, editorMinisterio, usuario) =====
 // Ojo: esto solo pide usuario y contraseña en pantalla. No protege los datos de Firebase.
-const USUARIO = 'admin';
-const CLAVE = 'admin';
-const LLAVE = 'musicapp_sesion';
+import {establecerSesion} from "./base.js";
+import {cargado,intentarLogin,usuarioPorId,montarSelectorAmbito} from "./usuarios.js";
 
-const leer = () => { try { return localStorage.getItem(LLAVE) === '1'; } catch { return false; } };
-const escribir = v => { try { v ? localStorage.setItem(LLAVE, '1') : localStorage.removeItem(LLAVE); } catch {} };
-const svg = d => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
-const NOTA = '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>';
-const SALIR = '<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>';
+const LLAVE='musicapp_sesion_id';
+const leerId=()=>{try{return localStorage.getItem(LLAVE)}catch{return null}};
+const escribirId=id=>{try{id?localStorage.setItem(LLAVE,id):localStorage.removeItem(LLAVE)}catch{}};
+const svg=d=>`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const NOTA='<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>';
+const SALIR='<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>';
 
 // Carga todas las pantallas a la vez y, cuando están listas, dibuja la pantalla actual
 async function iniciarApp() {
@@ -21,8 +21,9 @@ async function iniciarApp() {
   b.innerHTML = svg(SALIR) + '<span>Salir</span>';
   b.title = 'Cerrar sesión';
   b.setAttribute('aria-label', 'Salir');
-  b.onclick = () => { escribir(false); location.hash = ''; location.reload(); };
+  b.onclick = () => { escribirId(null); establecerSesion(null); location.hash = ''; location.reload(); };
   document.querySelector('header').append(b);
+  montarSelectorAmbito();
 }
 
 function mostrarLogin() {
@@ -43,8 +44,10 @@ function mostrarLogin() {
   f.u.focus();
   f.onsubmit = e => {
     e.preventDefault();
-    if (f.u.value.trim() === USUARIO && f.c.value === CLAVE) {
-      escribir(true);
+    const u = intentarLogin(f.u.value, f.c.value);
+    if (u) {
+      establecerSesion(u);
+      escribirId(u.id);
       app.innerHTML = '';
       iniciarApp();
     } else {
@@ -65,5 +68,12 @@ async function iniciarVer() {
   addEventListener('hashchange', () => { if (!location.hash.startsWith('#ver/')) location.reload(); });
 }
 
+async function arrancar() {
+  await cargado();                       // espera la primera lectura de la colección «usuarios»
+  const id = leerId(), u = id && usuarioPorId(id);
+  if (u) { establecerSesion(u); iniciarApp() }
+  else { escribirId(null); mostrarLogin() }
+}
+
 if (location.hash.startsWith('#ver/')) iniciarVer();
-else leer() ? iniciarApp() : mostrarLogin();
+else arrancar();
