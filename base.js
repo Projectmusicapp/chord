@@ -149,7 +149,7 @@ function irA(){
   if(!listo&&!ver)return;                               // espera el nombre y el logo guardados (así no aparece el nombre por defecto y luego cambia)
   document.body.classList.toggle('modo-ver',ver);
   const menu=menuDe();
-  $('#nav').innerHTML=v==='inicio'||ver?'':menu.map(([k,i,n])=>`<a href="#${k}" class="${k===v?'on':''}" ${k===v?'aria-current="page"':''}>${ic(i,18)}<span>${n}</span></a>`).join('');
+  $('#nav').innerHTML=ver?'':menu.map(([k,i,n])=>`<a href="#${k}" class="${k===v?'on':''}" ${k===v?'aria-current="page"':''}>${ic(i,18)}<span>${n}</span></a>`).join('');
   const el=$('#app');el.innerHTML='';el.className='';el.dataset.vista=v;
   el.onclick=el.oninput=el.onchange=el.onkeydown=null;   // quita lo que dejó la pantalla anterior
   const m=menu.find(x=>x[0]===v);document.title=(m?m[2]+' · ':'')+(cfg.nombre||'Músicapp');
