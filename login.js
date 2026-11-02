@@ -1,14 +1,14 @@
 // ===== LOGIN (cuentas reales en Firebase: admin, ministerio, usuario) =====
 // Ojo: esto solo pide usuario y contraseña en pantalla. No protege los datos de Firebase.
 import {establecerSesion} from "./base.js";
-import {cargado,intentarLogin,usuarioPorId,montarMiCuenta} from "./usuarios.js";
+import {cargado,intentarLogin,usuarioPorId,montarMenuUsuario} from "./usuarios.js";
 
 const LLAVE='musicapp_sesion_id';
 const leerId=()=>{try{return localStorage.getItem(LLAVE)}catch{return null}};
 const escribirId=id=>{try{id?localStorage.setItem(LLAVE,id):localStorage.removeItem(LLAVE)}catch{}};
 const svg=d=>`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const NOTA='<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>';
-const SALIR='<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>';
+const salir=()=>{escribirId(null);establecerSesion(null);location.hash='';location.reload()};
 
 // Carga todas las pantallas a la vez y, cuando están listas, dibuja la pantalla actual
 async function iniciarApp() {
@@ -16,14 +16,7 @@ async function iniciarApp() {
   const [base] = await Promise.all(['base', 'canciones', 'calendario', 'escalas', 'repertorio', 'respaldo', 'ver'].map(m => import(`./${m}.js`)));
   if (base.appCargada) base.appCargada();   // (por si el navegador aún tiene guardada una versión anterior de base.js)
   dispatchEvent(new HashChangeEvent('hashchange'));
-  const b = document.createElement('button');
-  b.className = 'salir';
-  b.innerHTML = svg(SALIR) + '<span>Salir</span>';
-  b.title = 'Cerrar sesión';
-  b.setAttribute('aria-label', 'Salir');
-  b.onclick = () => { escribirId(null); establecerSesion(null); location.hash = ''; location.reload(); };
-  document.querySelector('header').append(b);
-  montarMiCuenta();
+  montarMenuUsuario(salir);
 }
 
 function mostrarLogin() {
