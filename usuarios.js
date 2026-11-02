@@ -10,7 +10,10 @@
 //                          que pone el admin) pero no la edita. Tiene su
 //                          propia biblioteca privada, calendario y escalas,
 //                          separados de los demás ministerios. Puede crear
-//                          sus propios «editorMinisterio» y «usuario».
+//                          sus propios «editorMinisterio» y «usuario», y
+//                          también otros «ministerio» nuevos (quedan
+//                          independientes, con su propio espacio: no son
+//                          sub-equipos de quien los creó).
 //   editorMinisterio .... mismos permisos que su ministerio, dentro de ese
 //                          mismo ministerio (lo designa ese ministerio).
 //   usuario ............. solo ve (de su ministerio + la biblioteca
@@ -75,8 +78,8 @@ const miMinisterio=u=>u.rol==='ministerio'?u.id:(u.ministerioId||null);
 const esMinisterioTier=u=>u.rol==='ministerio'||u.rol==='editorMinisterio';
 
 function rolesCreables(actor){
-  if(esNivelAdmin())return [['editor','Editor (como Administrador)'],['ministerio','Ministerio (equipo nuevo)'],['editorMinisterio','Editor de un ministerio'],['usuario','Usuario (solo ver)']];
-  if(esMinisterioTier(actor))return [['editorMinisterio','Editor de tu ministerio'],['usuario','Usuario (solo ver)']];
+  if(esNivelAdmin())return [['editor','Editor (como Administrador)'],['ministerio','Ministerio (equipo nuevo e independiente)'],['editorMinisterio','Editor de un ministerio'],['usuario','Usuario (solo ver)']];
+  if(esMinisterioTier(actor))return [['ministerio','Ministerio (equipo nuevo e independiente)'],['editorMinisterio','Editor de tu ministerio'],['usuario','Usuario (solo ver)']];
   return [];
 }
 function cuentasVisibles(actor){
@@ -211,8 +214,12 @@ function formNuevo(){
     if(!usuario||!clave)return err('Escribe usuario y contraseña.');
     if(U.some(x=>x.usuario.trim().toLowerCase()===usuario.toLowerCase()))return err('Ya existe una cuenta con ese usuario.');
     let ministerioId=null;
-    if(esMinisterioTier(actor))ministerioId=miMinisterio(actor);
-    else if(['editorMinisterio','usuario'].includes(rol)){
+    if(rol==='ministerio'){
+      // Un ministerio nuevo siempre es un espacio propio e independiente (su ministerioId se
+      // pone después, igual a su propio id), aunque lo cree otro ministerio.
+    }else if(esMinisterioTier(actor)){
+      ministerioId=miMinisterio(actor);
+    }else if(['editorMinisterio','usuario'].includes(rol)){
       ministerioId=$('#fm',o)?.value||'';
       if(!ministerioId)return err('Elige a qué ministerio pertenece, o crea un ministerio primero.');
     }
