@@ -32,6 +32,9 @@ const ROLES={admin:'Administrador',editor:'Editor',ministerio:'Ministerio',edito
 
 const st=document.createElement('style');
 st.textContent=`header .sel-ambito{margin-left:auto;margin-right:10px;max-width:160px;min-height:36px;background:#ffffff14;color:#fff;border-color:transparent}
+header .btn-clave{margin-left:auto;margin-right:8px;background:#ffffff14;color:#DDE3F5;min-height:36px;padding:6px 12px;font-size:14px;flex:none;display:inline-flex;align-items:center;gap:6px}
+header .btn-clave:hover{background:#ffffff26;filter:none}
+@media(max-width:480px){header .btn-clave span{display:none}header .btn-clave{width:40px;padding:0;justify-content:center}}
 [data-vista=usuarios] .ulist{display:grid;gap:8px;margin-top:14px}
 [data-vista=usuarios] .ufila{display:flex;align-items:center;gap:12px;background:var(--capa);border-radius:var(--r-m);padding:10px 12px;flex-wrap:wrap}
 [data-vista=usuarios] .ufila .un{flex:1;min-width:160px}
@@ -106,6 +109,39 @@ export function montarSelectorAmbito(){
   pintaSelector();
   const salir=header.querySelector('.salir');
   if(salir)header.insertBefore(elSelect,salir);else header.append(elSelect);
+}
+
+// ---------- Cambiar mi contraseña (cualquier cuenta, incluido el rol «usuario») ----------
+export function montarCambiarClave(){
+  const header=document.querySelector('header');
+  if(!header||!sesion()||header.querySelector('.btn-clave'))return;
+  const b=document.createElement('button');
+  b.className='btn-clave';
+  b.title='Cambiar mi contraseña';
+  b.setAttribute('aria-label','Cambiar mi contraseña');
+  b.innerHTML=ic('edt',16)+'<span>Contraseña</span>';
+  b.onclick=formMiClave;
+  const salir=header.querySelector('.salir');
+  if(salir)header.insertBefore(b,salir);else header.append(b);
+}
+function formMiClave(){
+  const actor=sesion();if(!actor)return;
+  const o=modal(`<div class="mh"><h2>Cambiar mi contraseña</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
+    <p style="margin-top:0;color:var(--gris)">Cuenta: <b>${esc(actor.usuario)}</b></p>
+    <label class="fl2" style="margin-bottom:12px">Nueva contraseña<input id="fc1" type="password" autocomplete="new-password"></label>
+    <label class="fl2" style="margin-bottom:12px">Repetir contraseña<input id="fc2" type="password" autocomplete="new-password"></label>
+    <p class="error" role="alert" hidden></p>
+    <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Guardar</button></div>`);
+  const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
+  const aceptar=()=>{
+    const c1=$('#fc1',o).value,c2=$('#fc2',o).value;
+    if(!c1)return err('Escribe una contraseña.');
+    if(c1!==c2)return err('Las contraseñas no coinciden.');
+    guardar('usuarios',actor.id,{clave:c1});
+    o.remove();aviso('Contraseña actualizada.');
+  };
+  o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.id==='ok')aceptar()};
+  o.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();aceptar()}};
 }
 
 // ---------- Pantalla «Usuarios» ----------

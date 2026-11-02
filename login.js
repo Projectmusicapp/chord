@@ -1,7 +1,7 @@
 // ===== LOGIN (cuentas reales en Firebase: admin, editor, ministerio, editorMinisterio, usuario) =====
 // Ojo: esto solo pide usuario y contraseña en pantalla. No protege los datos de Firebase.
 import {establecerSesion} from "./base.js";
-import {cargado,intentarLogin,usuarioPorId,montarSelectorAmbito} from "./usuarios.js";
+import {cargado,intentarLogin,usuarioPorId,montarSelectorAmbito,montarCambiarClave} from "./usuarios.js";
 
 const LLAVE='musicapp_sesion_id';
 const leerId=()=>{try{return localStorage.getItem(LLAVE)}catch{return null}};
@@ -24,6 +24,7 @@ async function iniciarApp() {
   b.onclick = () => { escribirId(null); establecerSesion(null); location.hash = ''; location.reload(); };
   document.querySelector('header').append(b);
   montarSelectorAmbito();
+  montarCambiarClave();
 }
 
 function mostrarLogin() {
