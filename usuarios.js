@@ -33,6 +33,7 @@
 // =====================================================================
 import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,puedeEditar,configActual} from "./base.js";
 import {ventana as abrirRespaldo} from "./respaldo.js";
+import {E,alCambiar} from "./estado.js";
 
 const ROLES={admin:'Administrador',ministerio:'Ministerio',usuario:'Usuario (solo ver)'};
 
@@ -75,6 +76,7 @@ escuchar('usuarios',l=>{
   }
   if(!listo){listo=true;esperando.forEach(r=>r());esperando.length=0}
   if(el)pintar();
+  pintarNovedades();
 });
 
 export function intentarLogin(usuario,clave){
@@ -307,15 +309,38 @@ function formEditar(u){
   o.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();aceptar()}};
 }
 
-// ---------- Novedades en Inicio: últimas cuentas añadidas, su rol y su misión de origen ----------
+// ---------- Novedades en Inicio: últimas cuentas y canciones añadidas ----------
+// Cuentas: mismo alcance que la pantalla Usuarios (el Administrador ve todo, un Ministerio
+// solo su propio equipo). Canciones: las mismas que ya se ven en Canciones (E.canciones de
+// estado.js, que respeta la biblioteca general + la privada del ministerio).
+let elInicio=null;
+function novedades(){
+  const actor=sesion();if(!actor)return [];
+  const cuentas=cuentasVisibles(actor).filter(u=>u.id!==actor.id).map(u=>({
+    creadoEn:u.creadoEn||0,
+    titulo:u.nombre||u.usuario,
+    sub:[ROLES[u.rol]||u.rol,etiquetaMinisterio(u),propioPais(u)].filter(Boolean).join(' · ')
+  }));
+  const canciones=E.canciones.map(c=>({
+    creadoEn:c.creadoEn||0,
+    titulo:c.titulo,
+    sub:['Canción',(E.albumes.find(a=>a.id===c.albumId)||{}).nombre].filter(Boolean).join(' · ')
+  }));
+  return [...cuentas,...canciones].sort((a,b)=>b.creadoEn-a.creadoEn).slice(0,6);
+}
+function pintarNovedades(){
+  if(!elInicio||!elInicio.isConnected)return;
+  const items=novedades();
+  let cont=elInicio.querySelector('.novedades');
+  if(!items.length){if(cont)cont.remove();return}
+  if(!cont){cont=document.createElement('section');cont.className='c2 novedades';elInicio.querySelector('.inicio').append(cont)}
+  cont.innerHTML=`<h2>Novedades</h2><div class="ulist">${items.map(it=>`<div class="ufila"><div class="un"><b>${esc(it.titulo)}</b>${it.sub?`<small>${esc(it.sub)}</small>`:''}</div></div>`).join('')}</div>`;
+}
 const inicioOrig=vistas.inicio;
 vistas.inicio=contenedor=>{
   inicioOrig(contenedor);
-  const actor=sesion();if(!actor)return;
-  const ultimas=cuentasVisibles(actor).filter(u=>u.id!==actor.id).slice().sort((a,b)=>(b.creadoEn||0)-(a.creadoEn||0)).slice(0,5);
-  if(!ultimas.length)return;
-  const sec=document.createElement('section');
-  sec.className='c2 novedades';
-  sec.innerHTML=`<h2>Novedades</h2><div class="ulist">${ultimas.map(u=>`<div class="ufila"><div class="un"><b>${esc(u.nombre||u.usuario)}</b><small>${esc([ROLES[u.rol]||u.rol,etiquetaMinisterio(u),propioPais(u)].filter(Boolean).join(' · '))}</small></div></div>`).join('')}</div>`;
-  contenedor.append(sec);
+  elInicio=contenedor;
+  pintarNovedades();
 };
+addEventListener('hashchange',()=>{const v=location.hash.slice(1)||'inicio';if(v!=='inicio')elInicio=null});
+alCambiar(pintarNovedades);

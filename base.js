@@ -46,7 +46,9 @@ function conAmbito(col,d){
   return amb?{...d,ministerioId:amb}:d;
 }
 export const guardar=(col,id,d,m=true)=>setDoc(doc(db,col,id),conAmbito(col,d),{merge:m});
-export const crear=(col,d)=>addDoc(collection(db,col),conAmbito(col,d));
+// crear: además de guardar, marca cuándo se creó (creadoEn) si no venía ya puesto — lo usa
+// la sección «Novedades» de Inicio para mostrar lo más reciente de cualquier colección.
+export const crear=(col,d)=>addDoc(collection(db,col),conAmbito(col,{creadoEn:Date.now(),...d}));
 
 // escucharPropio: como escuchar(), pero solo entrega lo que corresponde al ámbito actual,
 // y vuelve a llamar a fn si cambia de ámbito (por ejemplo, al cambiar de espacio de trabajo).
@@ -144,7 +146,10 @@ function irA(){
   (vistas[v]||(e=>{if(todoCargado)e.innerHTML='<div class="c2"><h2>Esta página no existe</h2><p><a href="#inicio">Volver al inicio</a></p></div>'}))(el);
 }
 
-// ===== INICIO (logo, nombre y 4 botones) =====
+// ===== INICIO =====
+// El letrero con el nombre/logo y los 4 botones de sección ya no van aquí (quedan en la
+// cabecera y en la barra de navegación). Inicio queda para «Novedades» (ver usuarios.js,
+// que agrega esa sección dentro de este mismo contenedor).
 // Cambiar el nombre/logo de la app y la copia de seguridad viven en la pantalla Usuarios
 // (sección de administración, solo para el nivel Administrador) — ver usuarios.js.
 let cfg={nombre:'Ministerio de música',logo:''},listo=0;
@@ -153,12 +158,7 @@ const cabecera=()=>{$('#logo').innerHTML=(cfg.logo?`<img src="${cfg.logo}" alt="
 
 const hoyLargo=()=>{const t=new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'});return t.charAt(0).toUpperCase()+t.slice(1)};
 vistas.inicio=el=>{
-  el.innerHTML=`<div class="inicio">
-    <div class="portada">${cfg.logo?`<img class="logo" src="${cfg.logo}" alt="Logo">`:`<div class="bigmark">${ic('mus',54)}</div>`}</div>
-    <h1>${esc(cfg.nombre)}</h1>
-    <p class="sub">${hoyLargo()}</p>
-    <div class="menu4">${menuDe().map(([k,i,n,d])=>`<a href="#${k}"><span class="mi">${ic(i,34)}</span><span>${n}</span><small>${d}</small></a>`).join('')}</div>
-  </div>`;
+  el.innerHTML=`<div class="inicio"><p class="sub">${hoyLargo()}</p></div>`;
 };
 
 escuchar('config',l=>{
