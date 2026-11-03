@@ -23,7 +23,9 @@
 //  se separan con el campo «ministerioId» (ver conAmbito en base.js). Una
 //  cuenta «ministerio» independiente usa su propio id como ministerioId;
 //  un «ayudante» usa el id del equipo al que pertenece (ver ambitoActual
-//  en base.js).
+//  en base.js). Un ministerio independiente también tiene un «pais»
+//  (texto libre, la misión de origen). «creadoEn» (fecha en milisegundos)
+//  se usa para la sección «Novedades» de Inicio.
 //
 //  OJO: igual que el login anterior, esto no protege los datos en Firebase
 //  directamente: solo la propia app respeta estos permisos. Las claves se
@@ -44,6 +46,10 @@ header .dd-usuario .nombre{padding:8px 10px 10px;font-weight:700;color:var(--tx)
 header .dd-usuario button{background:transparent;color:var(--tx);justify-content:flex-start;text-align:left;min-height:38px}
 header .dd-usuario button:hover{background:var(--capa);filter:none}
 @media(max-width:480px){header .btn-usuario{max-width:40px;padding:0;justify-content:center}header .btn-usuario span{display:none}}
+.novedades{margin-top:24px}
+.novedades .ulist{display:grid;gap:8px;margin-top:10px}
+.novedades .ufila{display:flex;align-items:center;gap:12px;background:var(--capa);border-radius:var(--r-m);padding:10px 12px}
+.novedades .ufila small{display:block;color:var(--gris);font-weight:500}
 [data-vista=usuarios] .config{background:var(--capa);border-radius:var(--r-m);padding:14px;margin-bottom:18px;display:flex;flex-direction:column;gap:10px}
 [data-vista=usuarios] .config .mb2{margin:0}
 [data-vista=usuarios] .ulist{display:grid;gap:8px;margin-top:14px}
@@ -64,7 +70,7 @@ escuchar('usuarios',l=>{
   U=l;
   if(!l.length){
     // Primera vez que se usa la app: no hay ninguna cuenta. Se crea el admin inicial.
-    crear('usuarios',{usuario:'admin',clave:'admin',nombre:'Administrador',rol:'admin',ministerioId:null,activo:true,creadoPor:null});
+    crear('usuarios',{usuario:'admin',clave:'admin',nombre:'Administrador',rol:'admin',ministerioId:null,activo:true,creadoPor:null,creadoEn:Date.now()});
     return;   // se espera el siguiente aviso de Firebase, ya con esta cuenta creada
   }
   if(!listo){listo=true;esperando.forEach(r=>r());esperando.length=0}
@@ -165,11 +171,16 @@ vistas.usuarios=contenedor=>{
 };
 addEventListener('hashchange',()=>{if(location.hash!=='#usuarios')el=null});
 
+// etiquetaMinisterio: a qué equipo pertenece esta cuenta (con su país, si lo tiene). Un
+// ministerio independiente no «pertenece» a sí mismo, así que esto queda vacío para esos
+// (su propio país se muestra aparte, ver `propioPais`).
 function etiquetaMinisterio(u){
-  if(!u.ministerioId||u.ministerioId===u.id)return '';   // un ministerio independiente no «pertenece» a sí mismo
+  if(!u.ministerioId||u.ministerioId===u.id)return '';
   const m=U.find(x=>x.id===u.ministerioId);
-  return m?(m.nombre||m.usuario):'(ministerio eliminado)';
+  if(!m)return '(ministerio eliminado)';
+  return m.pais?`${m.nombre||m.usuario} · ${m.pais}`:(m.nombre||m.usuario);
 }
+const propioPais=u=>esEspacioMinisterio(u)&&u.pais?u.pais:'';
 
 function pintar(){
   if(!el)return;
@@ -195,7 +206,7 @@ function pintar(){
 function fila(u,actor){
   const gestiona=puedeGestionar(u,actor);
   const tuya=u.id===actor.id;
-  const sub=[ROLES[u.rol]||u.rol,etiquetaMinisterio(u)].filter(Boolean).join(' · ');
+  const sub=[ROLES[u.rol]||u.rol,etiquetaMinisterio(u),propioPais(u)].filter(Boolean).join(' · ');
   return `<div class="ufila${u.activo===false?' inactiva':''}">
     <div class="un"><b>${esc(u.nombre||u.usuario)}${tuya?' (tú)':''}</b><small>Usuario: ${esc(u.usuario)}${u.activo===false?' · Desactivada':''}</small></div>
     <span class="rolchip">${esc(sub)}</span>
@@ -227,15 +238,21 @@ function formNuevo(){
     <label class="fl2" style="margin-bottom:12px">Contraseña<input id="fc" type="text" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Nivel<select id="fr">${roles.map(([v,t])=>`<option value="${v}">${esc(t)}</option>`).join('')}</select></label>
     ${necesitaTipo?`<label class="fl2" id="tipow" style="margin-bottom:12px">Tipo de ministerio<select id="tipo"><option value="nuevo">Nuevo e independiente</option><option value="ayudante">Ayudante de tu equipo (tu mismo espacio)</option></select></label>`:''}
+    <label class="fl2" id="paisw" style="margin-bottom:12px">País de la misión<input id="fp" autocomplete="off"></label>
     ${necesitaMinisterio?`<label class="fl2" id="fmw" style="margin-bottom:12px">Ministerio<select id="fm">${ministerios.map(m=>`<option value="${m.id}">${esc(m.nombre||m.usuario)}</option>`).join('')||'<option value="">(crea primero un ministerio)</option>'}</select></label>`:''}
     <p class="error" role="alert" hidden></p>
     <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Crear</button></div>`);
   const actualizaCampos=()=>{
     const rol=$('#fr',o).value;
+    const tipoSel=$('#tipo',o);
+    const esNueva=rol==='ministerio'&&(!tipoSel||tipoSel.value!=='ayudante');
     const wt=$('#tipow',o);if(wt)wt.hidden=rol!=='ministerio';
+    const wp=$('#paisw',o);if(wp)wp.hidden=!esNueva;
     const wm=$('#fmw',o);if(wm)wm.hidden=rol!=='usuario';
   };
-  if(necesitaTipo||necesitaMinisterio){actualizaCampos();$('#fr',o).onchange=actualizaCampos}
+  actualizaCampos();
+  $('#fr',o).onchange=actualizaCampos;
+  if(necesitaTipo)$('#tipo',o).onchange=actualizaCampos;
   const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
   const aceptar=()=>{
     const nombre=$('#fn',o).value.trim(),usuario=$('#fu',o).value.trim(),clave=$('#fc',o).value,rol=$('#fr',o).value;
@@ -254,7 +271,9 @@ function formNuevo(){
         if(!ministerioId)return err('Elige a qué ministerio pertenece, o crea un ministerio primero.');
       }
     }
-    crear('usuarios',{usuario,clave,nombre:nombre||usuario,rol,ministerioId,activo:true,creadoPor:actor.id}).then(ref=>{
+    const datos={usuario,clave,nombre:nombre||usuario,rol,ministerioId,activo:true,creadoPor:actor.id,creadoEn:Date.now()};
+    if(independiente)datos.pais=$('#fp',o).value.trim();
+    crear('usuarios',datos).then(ref=>{
       if(independiente)guardar('usuarios',ref.id,{ministerioId:ref.id});
     });
     o.remove();aviso('Cuenta creada.');
@@ -265,9 +284,11 @@ function formNuevo(){
 
 function formEditar(u){
   if(!u)return;
+  const esIndependiente=esEspacioMinisterio(u);
   const o=modal(`<div class="mh"><h2>Editar cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" value="${esc(u.nombre||'')}" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Usuario<input id="fu" value="${esc(u.usuario)}" autocomplete="off"></label>
+    ${esIndependiente?`<label class="fl2" style="margin-bottom:12px">País de la misión<input id="fp" value="${esc(u.pais||'')}" autocomplete="off"></label>`:''}
     <p style="margin:0 0 12px;color:var(--gris);font-size:13.5px">La contraseña solo la cambia cada cuenta desde el botón «Mi cuenta» de su propia sesión.</p>
     <label class="chk" style="margin:2px 0 14px"><input type="checkbox" id="fa" ${u.activo===false?'':'checked'}> Cuenta activa (puede iniciar sesión)</label>
     <p class="error" role="alert" hidden></p>
@@ -277,9 +298,24 @@ function formEditar(u){
     const nombre=$('#fn',o).value.trim(),usuario=$('#fu',o).value.trim(),activo=$('#fa',o).checked;
     if(!usuario)return err('Escribe un usuario.');
     if(U.some(x=>x.id!==u.id&&x.usuario.trim().toLowerCase()===usuario.toLowerCase()))return err('Ya existe otra cuenta con ese usuario.');
-    guardar('usuarios',u.id,{usuario,nombre:nombre||usuario,activo});
+    const cambios={usuario,nombre:nombre||usuario,activo};
+    if(esIndependiente)cambios.pais=$('#fp',o).value.trim();
+    guardar('usuarios',u.id,cambios);
     o.remove();aviso('Cambios guardados.');
   };
   o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.id==='ok')aceptar()};
   o.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();aceptar()}};
 }
+
+// ---------- Novedades en Inicio: últimas cuentas añadidas, su rol y su misión de origen ----------
+const inicioOrig=vistas.inicio;
+vistas.inicio=contenedor=>{
+  inicioOrig(contenedor);
+  const actor=sesion();if(!actor)return;
+  const ultimas=cuentasVisibles(actor).filter(u=>u.id!==actor.id).slice().sort((a,b)=>(b.creadoEn||0)-(a.creadoEn||0)).slice(0,5);
+  if(!ultimas.length)return;
+  const sec=document.createElement('section');
+  sec.className='c2 novedades';
+  sec.innerHTML=`<h2>Novedades</h2><div class="ulist">${ultimas.map(u=>`<div class="ufila"><div class="un"><b>${esc(u.nombre||u.usuario)}</b><small>${esc([ROLES[u.rol]||u.rol,etiquetaMinisterio(u),propioPais(u)].filter(Boolean).join(' · '))}</small></div></div>`).join('')}</div>`;
+  contenedor.append(sec);
+};
