@@ -31,7 +31,7 @@
 //  directamente: solo la propia app respeta estos permisos. Las claves se
 //  guardan tal cual, sin cifrar.
 // =====================================================================
-import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,puedeEditar,configActual} from "./base.js";
+import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,puedeEditar,configActual,hoyLargo} from "./base.js";
 import {ventana as abrirRespaldo} from "./respaldo.js";
 import {E,alCambiar} from "./estado.js";
 
@@ -47,10 +47,33 @@ header .dd-usuario .nombre{padding:8px 10px 10px;font-weight:700;color:var(--tx)
 header .dd-usuario button{background:transparent;color:var(--tx);justify-content:flex-start;text-align:left;min-height:38px}
 header .dd-usuario button:hover{background:var(--capa);filter:none}
 @media(max-width:480px){header .btn-usuario{max-width:40px;padding:0;justify-content:center}header .btn-usuario span{display:none}}
-.novedades{margin-top:24px}
-.novedades .ulist{display:grid;gap:8px;margin-top:10px}
-.novedades .ufila{display:flex;align-items:center;gap:12px;background:var(--capa);border-radius:var(--r-m);padding:10px 12px}
-.novedades .ufila small{display:block;color:var(--gris);font-weight:500}
+.inicio{display:flex;flex-direction:column;gap:24px}
+.bienvenida{background:linear-gradient(135deg,var(--azul),var(--azul-2));border-radius:var(--r-xl);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;box-shadow:var(--sombra-2)}
+.bienvenida h1{color:#fff;margin:0}
+.bienvenida p{color:#C9D1EC;margin:8px 0 0;font-size:15px}
+.bienvenida .chip{background:var(--oro);color:var(--azul);font-weight:800;font-size:13px;padding:7px 16px;border-radius:999px;white-space:nowrap}
+.col2{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.col2 .novedades{flex:999 1 560px;min-width:0}
+.col2 .barra-lateral{flex:1 1 280px;min-width:260px;display:flex;flex-direction:column;gap:18px}
+.novedades .nh{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.novedades .nh h2{margin:0;font-size:20px}
+.novedades .nh small{color:var(--gris);font-weight:600}
+.novedades .ulist{display:flex;flex-direction:column;margin-top:14px}
+.novedades .ulist .ufila{display:flex;align-items:flex-start;gap:14px;padding:13px 0;border-bottom:1px solid var(--linea);background:none;border-radius:0}
+.novedades .ulist .ufila:last-child{border-bottom:0}
+.novedades .nic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:none}
+.novedades .nic.cuenta{background:var(--capa);color:var(--azul)}
+.novedades .nic.cancion{background:var(--oro-claro);color:var(--oro-texto)}
+.novedades .un{flex:1;min-width:0}
+.novedades .cuando{color:var(--gris);font-size:12.5px;font-weight:600;white-space:nowrap;padding-top:2px}
+.espacio .eh{display:flex;align-items:center;gap:10px;margin-bottom:6px;color:var(--oro-texto)}
+.espacio .eh h3{color:var(--tx);margin:0;font-size:15px}
+.espacio p{margin:0;color:var(--gris);font-size:13.5px;font-weight:600;line-height:1.5}
+.accesos h3{margin:0 0 12px;font-size:15px}
+.accesos-lista{display:flex;flex-direction:column;gap:8px}
+.accesos-lista a{min-height:40px;border-radius:10px;font-weight:700;font-size:13.5px;display:flex;align-items:center;padding:0 14px;text-decoration:none;background:var(--azul);color:#fff}
+.accesos-lista a.sec{background:var(--suave);color:var(--azul)}
+@media(max-width:760px){.bienvenida{padding:22px}}
 [data-vista=usuarios] .config{background:var(--capa);border-radius:var(--r-m);padding:14px;margin-bottom:18px;display:flex;flex-direction:column;gap:10px}
 [data-vista=usuarios] .config .mb2{margin:0}
 [data-vista=usuarios] .ulist{display:grid;gap:8px;margin-top:14px}
@@ -76,7 +99,7 @@ escuchar('usuarios',l=>{
   }
   if(!listo){listo=true;esperando.forEach(r=>r());esperando.length=0}
   if(el)pintar();
-  pintarNovedades();
+  pintarInicio();
 });
 
 export function intentarLogin(usuario,clave){
@@ -309,38 +332,96 @@ function formEditar(u){
   o.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();aceptar()}};
 }
 
-// ---------- Novedades en Inicio: últimas cuentas y canciones añadidas ----------
+// ---------- Pantalla de Inicio: bienvenida, Novedades y accesos rápidos ----------
 // Cuentas: mismo alcance que la pantalla Usuarios (el Administrador ve todo, un Ministerio
 // solo su propio equipo). Canciones: las mismas que ya se ven en Canciones (E.canciones de
 // estado.js, que respeta la biblioteca general + la privada del ministerio).
 let elInicio=null;
+
+function tiempoRelativo(ms){
+  if(!ms)return '';
+  const seg=Math.max(0,(Date.now()-ms)/1000);
+  if(seg<90)return 'hace un momento';
+  const min=Math.round(seg/60);if(min<60)return `hace ${min} min`;
+  const hr=Math.round(min/60);if(hr<24)return `hace ${hr} h`;
+  const d=Math.round(hr/24);if(d<30)return `hace ${d} día${d===1?'':'s'}`;
+  const mes=Math.round(d/30);if(mes<12)return `hace ${mes} mes${mes===1?'':'es'}`;
+  const anio=Math.round(mes/12);return `hace ${anio} año${anio===1?'':'s'}`;
+}
+
+// contextoInicio: qué mostrar en el chip de bienvenida y en la tarjeta «Tu misión»/«Espacio».
+function contextoInicio(actor){
+  if(actor.rol==='admin')return{
+    chip:'Administrador · Espacio General',
+    espacioTitulo:'Espacio',
+    espacioSub:'General. Entra a Configuración para revisar la biblioteca, el calendario o las escalas de cualquier misión.'
+  };
+  if(esEspacioMinisterio(actor))return{
+    chip:'Ministerio'+(actor.pais?' · '+actor.pais:''),
+    espacioTitulo:'Tu misión',
+    espacioSub:(actor.nombre||actor.usuario)+(actor.pais?' · '+actor.pais:'')
+  };
+  const m=U.find(x=>x.id===actor.ministerioId);
+  const nombreM=m?(m.nombre||m.usuario):'(ministerio eliminado)';
+  const paisM=m&&m.pais?' · '+m.pais:'';
+  return{chip:(ROLES[actor.rol]||actor.rol)+paisM,espacioTitulo:'Tu misión',espacioSub:nombreM+paisM};
+}
+
+// accesosRapidos: a dónde navegar desde Inicio. Quien no puede editar solo ve accesos de ver.
+function accesosRapidos(){
+  return puedeEditar()
+    ?[['canciones','Nueva canción',''],['repertorio','Nuevo repertorio','sec'],['usuarios','Nueva cuenta','sec']]
+    :[['repertorio','Ver repertorio',''],['canciones','Ver canciones','sec']];
+}
+
 function novedades(){
   const actor=sesion();if(!actor)return [];
   const cuentas=cuentasVisibles(actor).filter(u=>u.id!==actor.id).map(u=>({
+    tipo:'cuenta',
     creadoEn:u.creadoEn||0,
     titulo:u.nombre||u.usuario,
     sub:[ROLES[u.rol]||u.rol,etiquetaMinisterio(u),propioPais(u)].filter(Boolean).join(' · ')
   }));
   const canciones=E.canciones.map(c=>({
+    tipo:'cancion',
     creadoEn:c.creadoEn||0,
     titulo:c.titulo,
     sub:['Canción',(E.albumes.find(a=>a.id===c.albumId)||{}).nombre].filter(Boolean).join(' · ')
   }));
   return [...cuentas,...canciones].sort((a,b)=>b.creadoEn-a.creadoEn).slice(0,6);
 }
-function pintarNovedades(){
+
+function pintarInicio(){
   if(!elInicio||!elInicio.isConnected)return;
+  const actor=sesion();if(!actor)return;
+  const wrap=elInicio.querySelector('.inicio');if(!wrap)return;
+  const ctx=contextoInicio(actor);
   const items=novedades();
-  let cont=elInicio.querySelector('.novedades');
-  if(!items.length){if(cont)cont.remove();return}
-  if(!cont){cont=document.createElement('section');cont.className='c2 novedades';elInicio.querySelector('.inicio').append(cont)}
-  cont.innerHTML=`<h2>Novedades</h2><div class="ulist">${items.map(it=>`<div class="ufila"><div class="un"><b>${esc(it.titulo)}</b>${it.sub?`<small>${esc(it.sub)}</small>`:''}</div></div>`).join('')}</div>`;
+  const iconoDe=tipo=>tipo==='cancion'?ic('mus',18):ic('usr',18);
+  const filaNovedad=it=>{
+    const cuando=tiempoRelativo(it.creadoEn);
+    return `<div class="ufila"><span class="nic ${it.tipo}">${iconoDe(it.tipo)}</span><div class="un"><b>${esc(it.titulo)}</b>${it.sub?`<small>${esc(it.sub)}</small>`:''}</div>${cuando?`<span class="cuando">${esc(cuando)}</span>`:''}</div>`;
+  };
+  wrap.innerHTML=`<div class="bienvenida">
+      <div><h1>Hola, ${esc(actor.nombre||actor.usuario)}</h1><p>${hoyLargo()}</p></div>
+      <span class="chip">${esc(ctx.chip)}</span>
+    </div>
+    <div class="col2">
+      <section class="c2 novedades">
+        <div class="nh"><h2>Novedades</h2><small>Lo más reciente</small></div>
+        <div class="ulist">${items.map(filaNovedad).join('')||'<p class="vacio">Aún no hay novedades.</p>'}</div>
+      </section>
+      <aside class="barra-lateral">
+        <div class="c2 espacio"><div class="eh">${ic('pin',16)}<h3>${esc(ctx.espacioTitulo)}</h3></div><p>${esc(ctx.espacioSub)}</p></div>
+        <div class="c2 accesos"><h3>Accesos rápidos</h3><div class="accesos-lista">${accesosRapidos().map(([h,t,c])=>`<a href="#${h}" class="${c}">${esc(t)}</a>`).join('')}</div></div>
+      </aside>
+    </div>`;
 }
 const inicioOrig=vistas.inicio;
 vistas.inicio=contenedor=>{
   inicioOrig(contenedor);
   elInicio=contenedor;
-  pintarNovedades();
+  pintarInicio();
 };
 addEventListener('hashchange',()=>{const v=location.hash.slice(1)||'inicio';if(v!=='inicio')elInicio=null});
-alCambiar(pintarNovedades);
+alCambiar(pintarInicio);
