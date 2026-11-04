@@ -186,7 +186,7 @@ body:has(#nav a) #aviso{bottom:calc(84px + env(safe-area-inset-bottom))}
 #editor{position:fixed;inset:0;background:var(--fondo);overflow:auto;padding:16px;z-index:10}
 
 /* ---------- 6. INICIO ---------- */
-.inicio{display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:clamp(8px,4vh,40px)}
+.inicio{display:flex;flex-direction:column}
 /* El nombre se apoya sobre un pentagrama (cinco líneas doradas) */
 .inicio .portada{position:relative;width:100%;display:flex;flex-direction:column;align-items:center;padding:6px 0 4px}
 .inicio .portada::before{content:"";position:absolute;left:0;right:0;top:50%;height:98px;transform:translateY(-50%);background:repeating-linear-gradient(to bottom,#C58A2B59 0 1.5px,transparent 1.5px 24px);background-size:100% 97.5px;background-repeat:no-repeat;-webkit-mask:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent);mask:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent);pointer-events:none}

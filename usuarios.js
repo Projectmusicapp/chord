@@ -73,6 +73,8 @@ header .dd-usuario button:hover{background:var(--capa);filter:none}
 .novedades .nic.cuenta{background:var(--capa);color:var(--azul)}
 .novedades .nic.cancion{background:var(--oro-claro);color:var(--oro-texto)}
 .novedades .un{flex:1;min-width:0}
+.novedades .un b{display:block}
+.novedades .un small{display:block;color:var(--gris);font-weight:500;margin-top:2px}
 .novedades .cuando{color:var(--gris);font-size:12.5px;font-weight:600;white-space:nowrap;padding-top:2px}
 .espacio .eh{display:flex;align-items:center;gap:10px;margin-bottom:6px;color:var(--oro-texto)}
 .espacio .eh h3{color:var(--tx);margin:0;font-size:15px}
