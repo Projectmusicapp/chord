@@ -1,15 +1,45 @@
 // ===== BASE: Firebase + funciones comunes + navegación + INICIO =====
-import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {initializeApp,deleteApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getFirestore,collection,doc,setDoc,addDoc,deleteDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,sendEmailVerification,updatePassword,reload} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {firebaseConfig} from "./firebase-config.js";
 
-const db=getFirestore(initializeApp(firebaseConfig));
+const app=initializeApp(firebaseConfig);
+const db=getFirestore(app);
+export const auth=getAuth(app);
 export const $=(s,r=document)=>r.querySelector(s);
 export const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 export const escuchar=(col,fn)=>onSnapshot(collection(db,col),s=>fn(s.docs.map(d=>({...d.data(),id:d.id}))));
+export const escucharDoc=(col,id,fn)=>onSnapshot(doc(db,col,id),s=>fn(s.exists()?{...s.data(),id:s.id}:null));
+
+// ===== AUTENTICACIÓN (Firebase Authentication: correo + contraseña) =====
+export const alCambiarAuth=fn=>onAuthStateChanged(auth,fn);
+export const iniciarSesionAuth=(correo,clave)=>signInWithEmailAndPassword(auth,correo,clave);
+export const cerrarSesionAuth=()=>signOut(auth);
+export const enviarVerificacion=user=>sendEmailVerification(user);
+export const cambiarMiClave=(user,clave)=>updatePassword(user,clave);
+export const recargarUsuarioAuth=user=>reload(user);
+// crearCuentaAuth: crea una cuenta nueva Y deja la sesión en ella (para el autorregistro,
+// donde es justo lo que se quiere: la persona queda conectada a su propia cuenta nueva).
+export const crearCuentaAuth=(correo,clave)=>createUserWithEmailAndPassword(auth,correo,clave);
+// crearCuentaComoAdmin: crea una cuenta para OTRA persona (desde Usuarios) sin cerrar la
+// sesión de quien la está creando. Firebase no deja crear cuentas ajenas desde el cliente
+// sin esto: se usa una app secundaria y efímera solo para ese alta, y se descarta después.
+export async function crearCuentaComoAdmin(correo,clave){
+  const secApp=initializeApp(firebaseConfig,'secundaria-'+Date.now());
+  try{
+    const secAuth=getAuth(secApp);
+    const cred=await createUserWithEmailAndPassword(secAuth,correo,clave);
+    await signOut(secAuth);
+    return cred.user.uid;
+  }finally{
+    await deleteApp(secApp);
+  }
+}
 
 // ===== SESIÓN (quién usa la app ahora mismo) =====
-// La guarda login.js (con establecerSesion) después de validar usuario y clave contra usuarios.js.
+// La arma login.js (con establecerSesion) combinando la cuenta de Firebase Authentication
+// con su documento en Firestore (rol, ministerioId, nombre...).
 let usuarioActual=null;
 export const sesion=()=>usuarioActual;
 export function establecerSesion(u){usuarioActual=u}
