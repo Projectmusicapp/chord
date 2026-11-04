@@ -4,7 +4,9 @@ import {montarMenuUsuario,cargado,sinCuentas,misionesDisponibles,crearPrimerAdmi
 
 const svg=d=>`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const NOTA='<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>';
-const salir=()=>cerrarSesionAuth();
+// Recarga la página después de salir: así no queda nada de la sesión anterior pegado en
+// la cabecera (el menú con el nombre, etc.) ni en el estado interno de las pantallas.
+const salir=async()=>{try{await cerrarSesionAuth()}finally{location.reload()}};
 
 const ERRORES_AUTH={
   'auth/invalid-credential':'Correo o contraseña incorrectos. Revisa los datos e inténtalo otra vez.',
