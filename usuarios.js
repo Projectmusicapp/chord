@@ -77,10 +77,6 @@ header .dd-usuario button:hover{background:var(--capa);filter:none}
 .espacio .eh{display:flex;align-items:center;gap:10px;margin-bottom:6px;color:var(--oro-texto)}
 .espacio .eh h3{color:var(--tx);margin:0;font-size:15px}
 .espacio p{margin:0;color:var(--gris);font-size:13.5px;font-weight:600;line-height:1.5}
-.accesos h3{margin:0 0 12px;font-size:15px}
-.accesos-lista{display:flex;flex-direction:column;gap:8px}
-.accesos-lista a{min-height:40px;border-radius:10px;font-weight:700;font-size:13.5px;display:flex;align-items:center;padding:0 14px;text-decoration:none;background:var(--azul);color:#fff}
-.accesos-lista a.sec{background:var(--suave);color:var(--azul)}
 @media(max-width:760px){.bienvenida{padding:22px}}
 [data-vista=usuarios] .config{background:var(--capa);border-radius:var(--r-m);padding:14px;margin-bottom:18px;display:flex;flex-direction:column;gap:10px}
 [data-vista=usuarios] .config .mb2{margin:0}
@@ -393,13 +389,6 @@ function contextoInicio(actor){
   return{chip:(ROLES[actor.rol]||actor.rol)+paisM,espacioTitulo:'Tu misión',espacioSub:nombreM+paisM};
 }
 
-// accesosRapidos: a dónde navegar desde Inicio. Quien no puede editar solo ve accesos de ver.
-function accesosRapidos(){
-  return puedeEditar()
-    ?[['canciones','Nueva canción',''],['repertorio','Nuevo repertorio','sec'],['usuarios','Nueva cuenta','sec']]
-    :[['repertorio','Ver repertorio',''],['canciones','Ver canciones','sec']];
-}
-
 function novedades(){
   const actor=sesion();if(!actor)return [];
   const cuentas=cuentasVisibles(actor).filter(u=>u.id!==actor.id).map(u=>({
@@ -439,7 +428,6 @@ function pintarInicio(){
       </section>
       <aside class="barra-lateral">
         <div class="c2 espacio"><div class="eh">${ic('pin',16)}<h3>${esc(ctx.espacioTitulo)}</h3></div><p>${esc(ctx.espacioSub)}</p></div>
-        <div class="c2 accesos"><h3>Accesos rápidos</h3><div class="accesos-lista">${accesosRapidos().map(([h,t,c])=>`<a href="#${h}" class="${c}">${esc(t)}</a>`).join('')}</div></div>
       </aside>
     </div>`;
 }
