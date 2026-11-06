@@ -226,13 +226,14 @@ function pintar(){
   const lista=cuentasVisibles(actor).slice().sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
   const admin=esNivelAdmin(),cfg=configActual();
   const config=admin?`<div class="config"><h2 style="margin:0">Administración</h2>
-      <div class="mb2"><button id="bl">${ic('img',16)} Cambiar logo</button>${cfg.logo?`<button class="sec" id="bq">${ic('x',16)} Quitar logo</button>`:''}<button id="bn">${ic('edt',16)} Cambiar nombre</button><button class="sec" id="br">${ic('cfg',16)} Copia de seguridad</button><input type="file" id="fl" accept="image/*" hidden></div>
+      <div class="mb2"><button id="bm">${ic('pin',16)} Nueva misión</button><button id="bl">${ic('img',16)} Cambiar logo</button>${cfg.logo?`<button class="sec" id="bq">${ic('x',16)} Quitar logo</button>`:''}<button id="bn">${ic('edt',16)} Cambiar nombre</button><button class="sec" id="br">${ic('cfg',16)} Copia de seguridad</button><input type="file" id="fl" accept="image/*" hidden></div>
     </div>`:'';
   el.innerHTML=`<div class="ch2"><h1>Usuarios</h1><button data-nu>${ic('pls',16)} Nueva cuenta</button></div>
     ${config}
     <div class="ulist">${lista.map(u=>fila(u,actor)).join('')||'<p class="vacio">Aún no hay cuentas aquí.</p>'}</div>`;
   el.onclick=clic;
   if(admin){
+    const bm=$('#bm',el);if(bm)bm.onclick=formNuevaMision;
     const bl=$('#bl',el);if(bl)bl.onclick=()=>$('#fl',el).click();
     const fl=$('#fl',el);if(fl)fl.onchange=async e=>guardar('config','app',{logo:await imagen(e.target.files[0],200)});
     const bq=$('#bq',el);if(bq)bq.onclick=()=>{if(confirm('¿Quitar el logo y volver al icono por defecto?'))guardar('config','app',{logo:''})};
@@ -331,6 +332,34 @@ function formNuevo(){
   };
   o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.id==='ok')aceptar()};
   o.onkeydown=e=>{if(e.key==='Enter'&&e.target.tagName!=='SELECT'){e.preventDefault();aceptar()}};
+}
+
+function formNuevaMision(){
+  const actor=sesion();
+  const o=modal(`<div class="mh"><h2>Nueva misión</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
+    <label class="fl2" style="margin-bottom:12px">Nombre de la misión<input id="fn" autocomplete="off"></label>
+    <label class="fl2" style="margin-bottom:12px">País<input id="fp" autocomplete="off"></label>
+    <label class="fl2" style="margin-bottom:12px">Correo de acceso<input id="fe" type="email" autocomplete="off"></label>
+    <label class="fl2" style="margin-bottom:12px">Contraseña (mínimo 6 caracteres)<input id="fc" type="text" autocomplete="off"></label>
+    <p class="error" role="alert" hidden></p>
+    <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Crear</button></div>`);
+  const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
+  const aceptar=async()=>{
+    const nombre=$('#fn',o).value.trim(),pais=$('#fp',o).value.trim(),correo=$('#fe',o).value.trim(),clave=$('#fc',o).value;
+    if(!nombre)return err('Escribe el nombre de la misión.');
+    if(!correo||!clave)return err('Escribe correo y contraseña.');
+    const btn=$('#ok',o);btn.disabled=true;
+    try{
+      const uid=await crearCuentaComoAdmin(correo,clave);
+      await guardar('usuarios',uid,{nombre,correo,rol:'ministerio',ministerioId:uid,pais,activo:true,creadoPor:actor.id,requiereVerificacion:false,creadoEn:Date.now()});
+      o.remove();aviso('Misión creada.');
+    }catch(ex){
+      btn.disabled=false;
+      err(ERRORES_AUTH[ex.code]||'No se pudo crear la misión. Intenta de nuevo.');
+    }
+  };
+  o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.id==='ok')aceptar()};
+  o.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();aceptar()}};
 }
 
 function formEditar(u){
