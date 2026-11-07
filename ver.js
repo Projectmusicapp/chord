@@ -20,7 +20,7 @@
 //   5. EVENTOS ........... clics, teclas y zoom con dos dedos
 // =====================================================================
 import {$,esc,escuchar,vistas} from "./base.js";
-import {MOM,fechaLarga,cancion} from "./hoja.js";
+import {MOM,fechaLarga,cancion,textoHtml,textosDespues,esPeticiones} from "./hoja.js";
 import {textoEquipo,htmlMiembros,alCambiarEquipos} from "./equipos.js";
 import {MAY,MEN,usaSostenidos,tokensAcorde,transponerChars,raizTono,esMenor,nombreTono,ix} from "./musica.js";
 
@@ -81,13 +81,15 @@ st.textContent=`.modo-ver header,.modo-ver #nav{display:none!important}
 document.head.append(st);
 
 // ---------- 2. DATOS (solo lectura) ----------
-let R=null,C=null,el=null,id=null;
+let R=null,C=null,A=[],el=null,id=null;
 // Lo que cambia cada persona en su pantalla. Se pierde al recargar (a propósito).
 const local={acordes:null,tonos:{},abierto:null,zoom:1,manual:false};
 let barraOculta=false;
 escuchar('repertorios',l=>{R=l;pintar()});
 alCambiarEquipos(()=>pintar());
 escuchar('canciones',l=>{C=l;pintar()});
+escuchar('albumes',l=>{A=l||[];pintar()});
+const albDe=c=>(A.find(a=>a.id===c.albumId)||{}).nombre||'';   // nombre del álbum de una canción
 
 vistas.ver=(e,rid)=>{
   if(id!==rid){id=rid;local.acordes=null;local.tonos={};local.abierto=null;local.zoom=1;local.manual=false}
@@ -136,9 +138,11 @@ const medio=d=>{const n=d>6?d-12:d;if(!n)return '';const a=Math.abs(n),t=(a>=2?M
 
 // Las canciones del repertorio, en orden, cada una con una clave propia (así cada una se transpone por separado)
 function bloques(r){
-  if(r.tipo==='evento')return (r.secciones||[]).map(s=>({titulo:s.nombre||'Sección',id:s.id,escala:s.escala,items:(s.canciones||[]).map((cid,i)=>({clave:'s:'+s.id+':'+i+':'+cid,cid}))}));
+  // textos escritos a mano: cada uno es su propio bloque, justo después del bloque donde se añadió ('ini' = al principio)
+  const tb=k=>textosDespues(r,k).map(t=>({titulo:(t.titulo||'').trim(),t,tx:true}));
+  if(r.tipo==='evento')return [...tb('ini'),...(r.secciones||[]).flatMap(s=>[{titulo:s.nombre||'Sección',id:s.id,escala:s.escala,sin:esPeticiones(s.nombre),items:(s.canciones||[]).map((cid,i)=>({clave:'s:'+s.id+':'+i+':'+cid,cid}))},...tb(s.id)])];
   const m=r.misa||{};
-  return MOM.filter(([k])=>m[k]).map(([k,n])=>({titulo:n,items:[{clave:'m:'+k+':'+m[k],cid:m[k]}]}));
+  return [...tb('ini'),...MOM.flatMap(([k,n])=>[...(m[k]?[{titulo:n,sin:esPeticiones(n),items:[{clave:'m:'+k+':'+m[k],cid:m[k]}]}]:[]),...tb(k)])];
 }
 
 // Estilo de los cuadros de tono y escala: fijos en la pantalla, abajo, sin zoom (viven FUERA de la hoja con zoom)
@@ -174,11 +178,12 @@ function pintar(){
   if(local.acordes===null)local.acordes=!!r.acordes;
   const ac=local.acordes;
   const hoja=bloques(r).map(b=>{
+    if(b.tx)return `<div class="blk">${b.titulo?`<div class="lab">${esc(b.titulo)}</div>`:''}${textoHtml(b.t)}</div>`;   // texto escrito a mano
     const canciones=b.items.map(({clave,cid})=>{
       const c0=C.find(x=>x.id===cid);if(!c0)return '';
       const d=local.tonos[clave]||0,c=transpuesta(c0,d),abierto=local.abierto===clave;
       const tono=t=>!transponible(c0)?'':`<span class="tdd"><button class="tono-b" data-tono="${clave}" aria-expanded="${abierto}" aria-label="Cambiar tono de ${esc(c0.titulo)}${t?', ahora '+esc(t):''}">${t?`Tono: ${esc(t)}`:'Tono'}${d?` <span class="dif">${medio(d)}</span>`:''} ${svg('<path d="M6 9l6 6 6-6"/>',13)}</button></span>`;
-      return cancion(c,ac,{tono});
+      return cancion(c,ac,{tono,album:b.sin?'':albDe(c0)});
     }).join('');
     return canciones?`<div class="blk"><div class="lab labx"><span>${esc(b.titulo)}</span>${r.tipo==='evento'?botonEquipo(b):''}</div>${canciones}</div>`:'';
   }).join('')||'<div class="falta">Este repertorio aún no tiene canciones.</div>';
