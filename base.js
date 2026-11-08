@@ -9,7 +9,7 @@ const db=getFirestore(app);
 export const auth=getAuth(app);
 export const $=(s,r=document)=>r.querySelector(s);
 export const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-export const escuchar=(col,fn)=>onSnapshot(collection(db,col),s=>fn(s.docs.map(d=>({...d.data(),id:d.id}))));
+export const escuchar=(col,fn,alError)=>onSnapshot(collection(db,col),s=>fn(s.docs.map(d=>({...d.data(),id:d.id}))),alError||(e=>console.error('No se pudo leer «'+col+'»:',e)));   // alError (opcional): qué hacer si falla la lectura
 export const escucharDoc=(col,id,fn)=>onSnapshot(doc(db,col,id),s=>fn(s.exists()?{...s.data(),id:s.id}:null));
 
 // ===== AUTENTICACIÓN (Firebase Authentication: correo + contraseña) =====
@@ -47,15 +47,14 @@ export const esNivelAdmin=()=>{const u=usuarioActual;return !!u&&u.rol==='admin'
 // puedeEditar: todos los roles pueden crear/editar algo EXCEPTO «usuario» (solo ve).
 export const puedeEditar=()=>{const u=usuarioActual;return !!u&&u.rol!=='usuario'};
 
-// ===== ÁMBITO: el «espacio» de un ministerio (su propio calendario, escalas, canciones...) =====
-// null = el espacio general/base (el del Administrador, que siempre trabaja ahí).
+// ===== ÁMBITO: el «espacio» de una misión (su propio calendario, escalas, canciones...) =====
+// «Misión» y «ministerio» son lo mismo. null = el espacio general/base (el del Administrador,
+// que siempre trabaja ahí). Las cuentas «ministerio» y «usuario» trabajan en el espacio de SU
+// misión: su campo ministerioId guarda el id de la misión (se crean en la pantalla Misiones).
 export function ambitoActual(){
   const u=usuarioActual;if(!u)return null;
   if(u.rol==='admin')return null;
-  // ministerio: su propio espacio, salvo que sea un «ayudante» de otro ministerio
-  // (en ese caso ministerioId apunta al espacio del equipo al que pertenece).
-  if(u.rol==='ministerio')return u.ministerioId||u.id;
-  return u.ministerioId||null;                   // usuario: el de su ministerio
+  return u.ministerioId||'sin-mision';           // una cuenta sin misión no ve nada ni toca el espacio general
 }
 const propioAmbito=d=>(d.ministerioId||null)===ambitoActual();
 // visibleBiblioteca: un álbum sin ministerioId es de la biblioteca general (de todos),

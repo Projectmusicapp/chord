@@ -13,27 +13,23 @@
 //               rol (otros admin, ministerios, usuarios). Todas las
 //               cuentas admin tienen el mismo poder (no hay «el admin
 //               original» y «sus ayudantes»: son todas iguales).
-//   ministerio  un equipo/misión. Ve la biblioteca general (lo que pone
-//               el admin) sin poder editarla. Tiene su propia biblioteca
-//               privada, calendario, escalas y repertorio, separados de
-//               los demás ministerios. Puede crear:
-//                - otras cuentas «ministerio» para SU MISMO equipo (los
-//                  «ayudantes»: ministerioId apunta al mismo espacio),
-//                - otras cuentas «ministerio» NUEVAS e independientes
-//                  (su propio espacio nuevo, no es un sub-equipo),
-//                - cuentas «usuario» para su equipo.
-//   usuario ... solo ve (su ministerio + la biblioteca general). No crea
+//   ministerio  un equipo de una MISIÓN (misión y ministerio son lo mismo).
+//               Ve la biblioteca general (lo que pone el admin) sin poder
+//               editarla. Tiene la biblioteca privada, el calendario, las
+//               escalas y los repertorios de SU misión (los comparte con las
+//               demás cuentas de esa misión). Puede crear cuentas «ministerio»
+//               y «usuario» para su misma misión.
+//   usuario ... solo ve (su misión + la biblioteca general). No crea
 //               ni edita nada. También puede llegar aquí por autorregistro
 //               (ver login.js): esas cuentas quedan con requiereVerificacion
 //               = true hasta que confirman su correo.
 //
-//  Los datos de cada ministerio (álbumes propios, calendario, escalas...)
-//  se separan con el campo «ministerioId» (ver conAmbito en base.js). Una
-//  cuenta «ministerio» independiente usa su propio id (uid) como
-//  ministerioId; un «ayudante» usa el id del equipo al que pertenece (ver
-//  ambitoActual en base.js). Un ministerio independiente también tiene un
-//  «pais» (texto libre, la misión de origen). «creadoEn» (fecha en
-//  milisegundos) se usa para la sección «Novedades» de Inicio.
+//  Las misiones las crea el Administrador en la pantalla «Misiones» (ver
+//  misiones.js). Cada cuenta ministerio/usuario guarda en «ministerioId» el
+//  id de su misión, y los datos de cada misión (álbumes propios, calendario,
+//  escalas...) se separan con ese mismo campo (ver conAmbito y ambitoActual
+//  en base.js). «creadoEn» (fecha en milisegundos) se usa para la sección
+//  «Novedades» de Inicio.
 //
 //  Una cuenta creada por un Administrador o un Ministerio (desde «Nueva
 //  cuenta») queda con requiereVerificacion:false: se confía en quien la
@@ -42,6 +38,7 @@
 import {$,esc,guardar,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,puedeEditar,configActual,hoyLargo,auth,cambiarMiClave,crearCuentaAuth,crearCuentaComoAdmin,enviarVerificacion} from "./base.js";
 import {ventana as abrirRespaldo} from "./respaldo.js";
 import {E,alCambiar} from "./estado.js";
+import {misionesCargadas,alCambiarMisiones,listaMisiones,misionPorId,etiquetaMision} from "./misiones.js";
 
 const ROLES={admin:'Administrador',ministerio:'Ministerio',usuario:'Usuario (solo ver)'};
 
@@ -94,7 +91,8 @@ document.head.append(st);
 
 let U=[],listo=false,el=null;
 const esperando=[];
-export const cargado=()=>listo?Promise.resolve():new Promise(r=>esperando.push(r));
+const usuariosCargados=()=>listo?Promise.resolve():new Promise(r=>esperando.push(r));
+export const cargado=()=>Promise.all([usuariosCargados(),misionesCargadas()]).then(()=>{});   // esperan las cuentas y las misiones
 export const sinCuentas=()=>listo&&U.length===0;
 
 escuchar('usuarios',l=>{
@@ -103,18 +101,22 @@ escuchar('usuarios',l=>{
   if(el)pintar();
   pintarInicio();
 });
+alCambiarMisiones(()=>{if(el)pintar();pintarInicio()});   // si cambian las misiones, se vuelven a dibujar los nombres
 
-// ---------- A qué ministerio pertenecen las cuentas que crea/gestiona cada rol ----------
-// miMinisterio: el espacio en el que trabaja esta cuenta (un ministerio independiente usa su
-// propio id; un «ayudante» usa el id del equipo al que pertenece).
-const miMinisterio=u=>u.rol==='ministerio'?(u.ministerioId||u.id):(u.ministerioId||null);
+// ---------- A qué misión pertenecen las cuentas ----------
+// miMision: la misión de esta cuenta (su «ministerioId»). El Administrador no tiene (null: trabaja en el espacio general).
+const miMision=u=>u.rol==='admin'?null:(u.ministerioId||null);
 const esMinisterioTier=u=>u.rol==='ministerio';
-// esEspacioMinisterio: ¿este doc «ministerio» ES un espacio (independiente), y no un ayudante
-// que comparte el espacio de otro? Solo estos aparecen como «ministerios» para elegir.
-const esEspacioMinisterio=u=>u.rol==='ministerio'&&(!u.ministerioId||u.ministerioId===u.id);
-// misionesDisponibles: para el selector de misión del autorregistro (ver login.js).
+// misionesDisponibles: para el selector de misión del autorregistro (ver login.js). Ya vienen ordenadas por país.
 export function misionesDisponibles(){
-  return U.filter(esEspacioMinisterio).map(m=>({id:m.id,nombre:m.nombre||m.correo,pais:m.pais||''}));
+  return listaMisiones().map(m=>({id:m.id,nombre:m.nombre,pais:m.pais||''}));
+}
+// misionDe: el texto de la misión de una cuenta, para mostrarlo en pantalla.
+function misionDe(u){
+  if(u.rol==='admin')return '';
+  if(!u.ministerioId)return 'Sin misión';
+  const m=misionPorId(u.ministerioId);
+  return m?etiquetaMision(m):'(misión eliminada)';
 }
 
 // ---------- Primera cuenta / autorregistro (los llama login.js) ----------
@@ -132,18 +134,19 @@ export async function autorregistrar(nombre,correo,clave,ministerioId){
 
 function rolesCreables(actor){
   if(esNivelAdmin())return [['admin','Administrador (como tú)'],['ministerio','Ministerio'],['usuario','Usuario (solo ver)']];
-  if(esMinisterioTier(actor))return [['ministerio','Ministerio'],['usuario','Usuario (solo ver)']];
+  if(esMinisterioTier(actor))return [['ministerio','Ministerio (de tu misión)'],['usuario','Usuario (solo ver)']];
   return [];
 }
 function cuentasVisibles(actor){
   if(esNivelAdmin())return U;
-  const amb=miMinisterio(actor);
-  return U.filter(u=>(u.ministerioId||null)===amb);
+  const mision=miMision(actor);
+  return mision?U.filter(u=>u.ministerioId===mision):[];
 }
 function puedeGestionar(u,actor){
   if(u.id===actor.id)return false;              // su propia cuenta no se gestiona desde aquí
   if(esNivelAdmin())return true;
-  return esMinisterioTier(actor)&&(u.ministerioId||null)===miMinisterio(actor);
+  const mision=miMision(actor);
+  return esMinisterioTier(actor)&&!!mision&&u.ministerioId===mision;
 }
 
 // ---------- Menú de usuario en la cabecera: nombre, Mi cuenta, Configuración y Salir ----------
@@ -159,6 +162,7 @@ export function montarMenuUsuario(salir){
       <div class="nombre">${esc(actor.nombre||actor.correo)}</div>
       <button data-mc>${ic('usr',15)} Mi cuenta</button>
       ${puedeEditar()?`<button data-cfg>${ic('cfg',15)} Configuración</button>`:''}
+      ${esNivelAdmin()?`<button data-mis>${ic('pin',15)} Misiones</button>`:''}
       <button data-sal>${ic('out',15)} Salir</button>
     </div>`;
   const boton=cont.querySelector('.btn-usuario'),dd=cont.querySelector('.dd-usuario');
@@ -167,6 +171,7 @@ export function montarMenuUsuario(salir){
   document.addEventListener('click',e=>{if(!dd.hidden&&!cont.contains(e.target))cerrar()});
   cont.querySelector('[data-mc]').onclick=()=>{cerrar();location.hash='cuenta'};
   const cfgBtn=cont.querySelector('[data-cfg]');if(cfgBtn)cfgBtn.onclick=()=>{cerrar();location.hash='usuarios'};
+  const misBtn=cont.querySelector('[data-mis]');if(misBtn)misBtn.onclick=()=>{cerrar();location.hash='misiones'};
   cont.querySelector('[data-sal]').onclick=()=>{cerrar();salir()};
   header.append(cont);
 }
@@ -174,7 +179,7 @@ export function montarMenuUsuario(salir){
 // ---------- Pantalla «Mi cuenta» (cualquier rol): datos propios y contraseña ----------
 vistas.cuenta=contenedor=>{
   const actor=sesion();if(!actor)return;
-  const mision=actor.ministerioId&&actor.ministerioId!==actor.id?etiquetaMinisterio(actor):'';
+  const mision=misionDe(actor);
   contenedor.innerHTML=`<div class="ch2"><h1>Mi cuenta</h1></div>
     ${mision?`<p style="color:var(--gris)">Misión a la que perteneces: <b>${esc(mision)}</b></p>`:''}
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" value="${esc(actor.nombre||'')}" autocomplete="off"></label>
@@ -209,16 +214,6 @@ vistas.usuarios=contenedor=>{
 };
 addEventListener('hashchange',()=>{if(location.hash!=='#usuarios')el=null});
 
-// etiquetaMinisterio: a qué equipo pertenece esta cuenta (con su país, si lo tiene). Un
-// ministerio independiente no «pertenece» a sí mismo, así que esto queda vacío para esos
-// (su propio país se muestra aparte, ver `propioPais`).
-function etiquetaMinisterio(u){
-  if(!u.ministerioId||u.ministerioId===u.id)return '';
-  const m=U.find(x=>x.id===u.ministerioId);
-  if(!m)return '(ministerio eliminado)';
-  return m.pais?`${m.nombre||m.correo} · ${m.pais}`:(m.nombre||m.correo);
-}
-const propioPais=u=>esEspacioMinisterio(u)&&u.pais?u.pais:'';
 
 function pintar(){
   if(!el)return;
@@ -226,14 +221,13 @@ function pintar(){
   const lista=cuentasVisibles(actor).slice().sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
   const admin=esNivelAdmin(),cfg=configActual();
   const config=admin?`<div class="config"><h2 style="margin:0">Administración</h2>
-      <div class="mb2"><button id="bm">${ic('pin',16)} Nueva misión</button><button id="bl">${ic('img',16)} Cambiar logo</button>${cfg.logo?`<button class="sec" id="bq">${ic('x',16)} Quitar logo</button>`:''}<button id="bn">${ic('edt',16)} Cambiar nombre</button><button class="sec" id="br">${ic('cfg',16)} Copia de seguridad</button><input type="file" id="fl" accept="image/*" hidden></div>
+      <div class="mb2"><button id="bl">${ic('img',16)} Cambiar logo</button>${cfg.logo?`<button class="sec" id="bq">${ic('x',16)} Quitar logo</button>`:''}<button id="bn">${ic('edt',16)} Cambiar nombre</button><button class="sec" id="br">${ic('cfg',16)} Copia de seguridad</button><input type="file" id="fl" accept="image/*" hidden></div>
     </div>`:'';
   el.innerHTML=`<div class="ch2"><h1>Usuarios</h1><button data-nu>${ic('pls',16)} Nueva cuenta</button></div>
     ${config}
     <div class="ulist">${lista.map(u=>fila(u,actor)).join('')||'<p class="vacio">Aún no hay cuentas aquí.</p>'}</div>`;
   el.onclick=clic;
   if(admin){
-    const bm=$('#bm',el);if(bm)bm.onclick=formNuevaMision;
     const bl=$('#bl',el);if(bl)bl.onclick=()=>$('#fl',el).click();
     const fl=$('#fl',el);if(fl)fl.onchange=async e=>guardar('config','app',{logo:await imagen(e.target.files[0],200)});
     const bq=$('#bq',el);if(bq)bq.onclick=()=>{if(confirm('¿Quitar el logo y volver al icono por defecto?'))guardar('config','app',{logo:''})};
@@ -246,7 +240,7 @@ function fila(u,actor){
   const gestiona=puedeGestionar(u,actor);
   const tuya=u.id===actor.id;
   const pendiente=u.requiereVerificacion&&!u.emailVerified&&u.id!==actor.id;
-  const sub=[ROLES[u.rol]||u.rol,etiquetaMinisterio(u),propioPais(u)].filter(Boolean).join(' · ');
+  const sub=[ROLES[u.rol]||u.rol,misionDe(u)].filter(Boolean).join(' · ');
   return `<div class="ufila${u.activo===false?' inactiva':''}">
     <div class="un"><b>${esc(u.nombre||u.correo)}${tuya?' (tú)':''}</b><small>${esc(u.correo||'')}${u.activo===false?' · Desactivada':''}</small></div>
     <span class="rolchip">${esc(sub)}</span>
@@ -276,54 +270,34 @@ const ERRORES_AUTH={
 function formNuevo(){
   const actor=sesion(),roles=rolesCreables(actor);
   if(!roles.length)return;
-  const necesitaMinisterio=esNivelAdmin();          // admin eligiendo a qué ministerio pertenece un «usuario»
-  const necesitaTipo=esMinisterioTier(actor);       // ministerio creando otro «ministerio»: ¿nuevo o ayudante?
-  const ministerios=U.filter(esEspacioMinisterio);
+  const elegirMision=esNivelAdmin();                // el admin elige la misión; un ministerio crea siempre dentro de la suya
+  const misiones=listaMisiones();
   const o=modal(`<div class="mh"><h2>Nueva cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Correo<input id="fe" type="email" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Contraseña (mínimo 6 caracteres)<input id="fc" type="text" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Nivel<select id="fr">${roles.map(([v,t])=>`<option value="${v}">${esc(t)}</option>`).join('')}</select></label>
-    ${necesitaTipo?`<label class="fl2" id="tipow" style="margin-bottom:12px">Tipo de ministerio<select id="tipo"><option value="nuevo">Nuevo e independiente</option><option value="ayudante">Ayudante de tu equipo (tu mismo espacio)</option></select></label>`:''}
-    <label class="fl2" id="paisw" style="margin-bottom:12px">País de la misión<input id="fp" autocomplete="off"></label>
-    ${necesitaMinisterio?`<label class="fl2" id="fmw" style="margin-bottom:12px">Ministerio<select id="fm">${ministerios.map(m=>`<option value="${m.id}">${esc(m.nombre||m.correo)}</option>`).join('')||'<option value="">(crea primero un ministerio)</option>'}</select></label>`:''}
+    ${elegirMision?`<label class="fl2" id="fmw" style="margin-bottom:12px">Misión<select id="fm">${misiones.map(m=>`<option value="${m.id}">${esc(etiquetaMision(m))}</option>`).join('')||'<option value="">(crea primero una misión)</option>'}</select></label>`:''}
     <p class="error" role="alert" hidden></p>
     <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Crear</button></div>`);
   const actualizaCampos=()=>{
-    const rol=$('#fr',o).value;
-    const tipoSel=$('#tipo',o);
-    const esNueva=rol==='ministerio'&&(!tipoSel||tipoSel.value!=='ayudante');
-    const wt=$('#tipow',o);if(wt)wt.hidden=rol!=='ministerio';
-    const wp=$('#paisw',o);if(wp)wp.hidden=!esNueva;
-    const wm=$('#fmw',o);if(wm)wm.hidden=rol!=='usuario';
+    const wm=$('#fmw',o);if(wm)wm.hidden=$('#fr',o).value==='admin';   // un Administrador no pertenece a ninguna misión
   };
   actualizaCampos();
   $('#fr',o).onchange=actualizaCampos;
-  if(necesitaTipo)$('#tipo',o).onchange=actualizaCampos;
   const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
   const aceptar=async()=>{
     const nombre=$('#fn',o).value.trim(),correo=$('#fe',o).value.trim(),clave=$('#fc',o).value,rol=$('#fr',o).value;
     if(!correo||!clave)return err('Escribe correo y contraseña.');
-    let ministerioId=null,independiente=false;
-    if(rol==='admin'){
-      // ministerioId queda null: todo admin es del espacio general.
-    }else if(rol==='ministerio'){
-      if(necesitaTipo&&$('#tipo',o).value==='ayudante')ministerioId=miMinisterio(actor);
-      else independiente=true;
-    }else if(rol==='usuario'){
-      if(esMinisterioTier(actor))ministerioId=miMinisterio(actor);
-      else{
-        ministerioId=$('#fm',o)?.value||'';
-        if(!ministerioId)return err('Elige a qué ministerio pertenece, o crea un ministerio primero.');
-      }
+    let ministerioId=null;                          // ministerioId = el id de la misión (null para un Administrador)
+    if(rol!=='admin'){
+      ministerioId=elegirMision?($('#fm',o).value||''):miMision(actor);
+      if(!ministerioId)return err('Elige la misión a la que pertenece, o crea una misión primero.');
     }
     const btn=$('#ok',o);btn.disabled=true;
     try{
       const uid=await crearCuentaComoAdmin(correo,clave);
-      if(independiente)ministerioId=uid;
-      const datos={nombre:nombre||correo,correo,rol,ministerioId,activo:true,creadoPor:actor.id,requiereVerificacion:false,creadoEn:Date.now()};
-      if(independiente)datos.pais=$('#fp',o).value.trim();
-      await guardar('usuarios',uid,datos);
+      await guardar('usuarios',uid,{nombre:nombre||correo,correo,rol,ministerioId,activo:true,creadoPor:actor.id,requiereVerificacion:false,creadoEn:Date.now()});
       o.remove();aviso('Cuenta creada.');
     }catch(ex){
       btn.disabled=false;
@@ -334,41 +308,14 @@ function formNuevo(){
   o.onkeydown=e=>{if(e.key==='Enter'&&e.target.tagName!=='SELECT'){e.preventDefault();aceptar()}};
 }
 
-function formNuevaMision(){
-  const actor=sesion();
-  const o=modal(`<div class="mh"><h2>Nueva misión</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
-    <label class="fl2" style="margin-bottom:12px">Nombre de la misión<input id="fn" autocomplete="off"></label>
-    <label class="fl2" style="margin-bottom:12px">País<input id="fp" autocomplete="off"></label>
-    <label class="fl2" style="margin-bottom:12px">Correo de acceso<input id="fe" type="email" autocomplete="off"></label>
-    <label class="fl2" style="margin-bottom:12px">Contraseña (mínimo 6 caracteres)<input id="fc" type="text" autocomplete="off"></label>
-    <p class="error" role="alert" hidden></p>
-    <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Crear</button></div>`);
-  const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
-  const aceptar=async()=>{
-    const nombre=$('#fn',o).value.trim(),pais=$('#fp',o).value.trim(),correo=$('#fe',o).value.trim(),clave=$('#fc',o).value;
-    if(!nombre)return err('Escribe el nombre de la misión.');
-    if(!correo||!clave)return err('Escribe correo y contraseña.');
-    const btn=$('#ok',o);btn.disabled=true;
-    try{
-      const uid=await crearCuentaComoAdmin(correo,clave);
-      await guardar('usuarios',uid,{nombre,correo,rol:'ministerio',ministerioId:uid,pais,activo:true,creadoPor:actor.id,requiereVerificacion:false,creadoEn:Date.now()});
-      o.remove();aviso('Misión creada.');
-    }catch(ex){
-      btn.disabled=false;
-      err(ERRORES_AUTH[ex.code]||'No se pudo crear la misión. Intenta de nuevo.');
-    }
-  };
-  o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.id==='ok')aceptar()};
-  o.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();aceptar()}};
-}
-
 function formEditar(u){
   if(!u)return;
-  const esIndependiente=esEspacioMinisterio(u);
+  const cambiaMision=esNivelAdmin()&&u.rol!=='admin';           // solo el admin pasa una cuenta a otra misión
+  const sinMision=!u.ministerioId||!misionPorId(u.ministerioId);
   const o=modal(`<div class="mh"><h2>Editar cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" value="${esc(u.nombre||'')}" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Correo<input id="fe" value="${esc(u.correo||'')}" disabled></label>
-    ${esIndependiente?`<label class="fl2" style="margin-bottom:12px">País de la misión<input id="fp" value="${esc(u.pais||'')}" autocomplete="off"></label>`:''}
+    ${cambiaMision?`<label class="fl2" style="margin-bottom:12px">Misión<select id="fm">${sinMision?'<option value="">(elige una misión)</option>':''}${listaMisiones().map(m=>`<option value="${m.id}" ${m.id===u.ministerioId?'selected':''}>${esc(etiquetaMision(m))}</option>`).join('')}</select></label>`:''}
     <p style="margin:0 0 12px;color:var(--gris);font-size:13.5px">La contraseña solo la cambia cada cuenta desde el botón «Mi cuenta» de su propia sesión. El correo no se puede cambiar aquí.</p>
     <label class="chk" style="margin:2px 0 14px"><input type="checkbox" id="fa" ${u.activo===false?'':'checked'}> Cuenta activa (puede iniciar sesión)</label>
     <p class="error" role="alert" hidden></p>
@@ -377,7 +324,7 @@ function formEditar(u){
   const aceptar=()=>{
     const nombre=$('#fn',o).value.trim(),activo=$('#fa',o).checked;
     const cambios={nombre:nombre||u.correo,activo};
-    if(esIndependiente)cambios.pais=$('#fp',o).value.trim();
+    if(cambiaMision){const v=$('#fm',o).value;if(v)cambios.ministerioId=v}
     guardar('usuarios',u.id,cambios);
     o.remove();aviso('Cambios guardados.');
   };
@@ -407,15 +354,10 @@ function contextoInicio(actor){
   if(actor.rol==='admin')return{
     chip:'Administrador · Espacio General',
     espacioTitulo:'Espacio',
-    espacioSub:'General. Entra a Configuración para revisar la biblioteca, el calendario o las escalas de cualquier misión.'
+    espacioSub:'General. Desde el menú de tu cuenta puedes gestionar las cuentas, las misiones y la configuración.'
   };
-  if(esEspacioMinisterio(actor))return{
-    chip:'Ministerio'+(actor.pais?' · '+actor.pais:''),
-    espacioTitulo:'Tu misión',
-    espacioSub:(actor.nombre||actor.correo)+(actor.pais?' · '+actor.pais:'')
-  };
-  const m=U.find(x=>x.id===actor.ministerioId);
-  const nombreM=m?(m.nombre||m.correo):'(ministerio eliminado)';
+  const m=misionPorId(actor.ministerioId);
+  const nombreM=m?m.nombre:(actor.ministerioId?'(misión eliminada)':'Sin misión');
   const paisM=m&&m.pais?' · '+m.pais:'';
   return{chip:(ROLES[actor.rol]||actor.rol)+paisM,espacioTitulo:'Tu misión',espacioSub:nombreM+paisM};
 }
@@ -426,7 +368,7 @@ function novedades(){
     tipo:'cuenta',
     creadoEn:u.creadoEn||0,
     titulo:u.nombre||u.correo,
-    sub:[ROLES[u.rol]||u.rol,etiquetaMinisterio(u),propioPais(u)].filter(Boolean).join(' · ')
+    sub:[ROLES[u.rol]||u.rol,misionDe(u)].filter(Boolean).join(' · ')
   }));
   const canciones=E.canciones.map(c=>({
     tipo:'cancion',
