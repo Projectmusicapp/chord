@@ -19,7 +19,7 @@ import {$,esc,guardar,crear,eliminar,imagen,vistas,ic,modal,puedeEditar,esNivelA
 import {E,alCambiar} from "./estado.js";
 import {abrir,editando,forzarCierre} from "./editor.js";
 import {etiquetas} from "./etiquetas.js";
-import {cancion} from "./hoja.js";
+import "./hoja.js";
 
 // ---------------------------------------------------------------------
 // 1. ESTILOS de esta pantalla
@@ -310,14 +310,8 @@ function alHacerClic(e){
     if(it.dataset.tipo==='album'){albumAbierto=it.dataset.id;return pintarContenido()}
     const c=E.canciones.find(x=>x.id===it.dataset.id);if(!c)return;
     const alb=E.albumes.find(a=>a.id===c.albumId);
-    if(puedeEditarAlbum(alb))abrir(c,pintarContenido);else verSolo(c);
+    abrir(c,pintarContenido,{soloLectura:!puedeEditarAlbum(alb)});   // si no puede editar este álbum, se abre el mismo editor pero solo para leer (y transponer sin guardar)
   }
-}
-
-// verSolo: para quien no puede editar, muestra la letra (y acordes) en una ventanita, sin abrir el editor.
-function verSolo(c){
-  const o=modal(`<div class="mh"><h2>${esc(c.titulo)}</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div><div class="hojap" style="padding:20px;box-shadow:none">${cancion(c,true)}</div>`);
-  o.onclick=e=>{if(e.target.closest('[data-cx]'))o.remove()};
 }
 
 // hacer: ejecuta una acción del menú ⋮.

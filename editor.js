@@ -1,7 +1,9 @@
 // =====================================================================
 //  EDITOR.JS  ·  El editor de canciones (la hoja con la barra de herramientas)
 //
-//  Se abre desde la pantalla Canciones con  abrir(cancion, alCerrar).
+//  Se abre desde la pantalla Canciones con  abrir(cancion, alCerrar, {soloLectura}).
+//  Con soloLectura:true (rol «usuario», o álbumes que no son del ministerio) se ve la misma hoja
+//  pero sin botones de edición, y solo se puede cambiar de pestaña, hacer zoom y transponer (sin guardar).
 //  alCerrar es una función que se ejecuta cuando cierras el editor.
 //
 //  MAPA (usa Ctrl+F para buscar cada parte):
@@ -134,8 +136,9 @@ const mapaCp=t=>{const m=[];let cp=0;for(let i=0;i<t.length;){const w=t.codePoin
 const recorta=ls=>{const o=[...ls];while(o.length>1&&!o[o.length-1].r.length)o.pop();return o};   // quita líneas vacías del final
 
 // ---------- LA FUNCIÓN PRINCIPAL ----------
-export function abrir(s,alCerrar){
+export function abrir(s,alCerrar,opc={}){
   if(ed)forzarCierre();
+  const soloLectura=!!opc.soloLectura;                       // true = nadie guarda nada desde esta ventana
   const A=E.albumes.filter(puedeEditarAlbum),T=E.etiquetas;   // álbumes donde se puede mover esta canción (el suyo ya está permitido) y etiquetas
   ed={titulo:'',tono:'',tonoAct:'',etiquetas:[],acordes:{},ac:null,cc:{},intro:'',interludios:[],final:null,fuente:'',fuenteA:'',lh:0,...structuredClone(s)};
   if(!ed.tonoAct)ed.tonoAct=ed.tono;
@@ -201,8 +204,8 @@ export function abrir(s,alCerrar){
     if(!p)return;
     const sq=l=>l.map(k=>`<button class="fb kq${k===act?' on':''}${k===ed.tono?' or':''}" data-tk="${k}" ${k===ed.tono?'title="Tono original"':''}>${k}</button>`).join('');
     p.innerHTML=ed.tono?`<div class="tr1"><button class="sec fb" data-tt="-2">-1</button><button class="sec fb" data-tt="-1">-\u00bd</button><button class="sec fb" data-tt="1">+\u00bd</button><button class="sec fb" data-tt="2">+1</button></div>
-      <div class="tr1"><button class="sec fb" data-tv>Volver al original</button><button class="sec fb" data-tf>Fijar como original</button></div>
-      <div class="tinfo">Original: <b>${esc(ed.tono)}</b> \u00b7 Actual: <b>${esc(act)}</b></div><div class="keys">${sq(esMenor(ed.tono)?MEN:MAY)}</div><button class="lnk fb" data-tr>Cambiar tono original</button>`
+      <div class="tr1"><button class="sec fb" data-tv>Volver al original</button>${soloLectura?'':'<button class="sec fb" data-tf>Fijar como original</button>'}</div>
+      <div class="tinfo">Original: <b>${esc(ed.tono)}</b> \u00b7 Actual: <b>${esc(act)}</b></div><div class="keys">${sq(esMenor(ed.tono)?MEN:MAY)}</div>${soloLectura?'':'<button class="lnk fb" data-tr>Cambiar tono original</button>'}`
       :`<div class="tinfo">\u00bfEn qu\u00e9 tono est\u00e1n escritos los acordes?</div><div class="tinfo">Mayores</div><div class="keys">${sq(MAY)}</div><div class="tinfo">Menores</div><div class="keys">${sq(MEN)}</div>`;
   };
     const marcaTam=()=>{const v=parseFloat($('#sz',ov).value);ov.querySelectorAll('[data-pp="sz"] button').forEach(x=>x.classList.toggle('actual',+x.dataset.f.split(':')[1]===v))};   // resalta en la lista el tamaño actual
@@ -657,11 +660,11 @@ export function abrir(s,alCerrar){
     const dd=(n,btn,body)=>{pp(n,body);return `<span class="dd">${btn}</span>`};
     const pal=(f,cols)=>`<div class="pal">${cols.map(c=>`<button class="fb" data-f="${f}:${c}" style="background:${c}" title="${c}" aria-label="${c}"></button>`).join('')}</div>`;
     const act=ed.tonoAct||ed.tono,fam=modo==='letra'?ed.fuente:ed.fuenteA;
-    ov.innerHTML=`<div class="tb"><div class="barra top"><input id="ti" placeholder="T\u00edtulo de la canci\u00f3n" aria-label="T\u00edtulo de la canci\u00f3n" value="${esc(ed.titulo)}"><select id="al" aria-label="\u00c1lbum" title="\u00c1lbum">${A.map(a=>`<option value="${a.id}" ${a.id===ed.albumId?'selected':''}>${esc(a.nombre)}</option>`).join('')}</select>
-        <div class="et"><div class="box"><input id="eq" value="${esc(eq)}" placeholder="${esc(resumen())}" autocomplete="off" aria-label="Buscar etiqueta"></div><button class="sec" id="eta" aria-label="Ver etiquetas">${svgI('<path d="M6 9l6 6 6-6"/>',14)}</button><div class="lista" ${verEt?'':'hidden'}>${listaEt()}</div></div>
-        <span class="dd"><button class="sec" id="tonb" data-pop="ton" ${modo==='letra'?'disabled title="La tonalidad se cambia en la pesta\u00f1a Acordes"':''}>Tonalidad${act?' \u00b7 <b>'+esc(act)+'</b>':''}</button>${pp('ton','','tonbox')}</span>
-        <span class="acc"><button class="sec" id="no">Cancelar</button><button id="ok">Guardar canci\u00f3n</button></span></div>
-      <div class="rib" ${plegada?'hidden':''}>
+    ov.innerHTML=`<div class="tb"><div class="barra top"><input id="ti" placeholder="T\u00edtulo de la canci\u00f3n" aria-label="T\u00edtulo de la canci\u00f3n" value="${esc(ed.titulo)}" ${soloLectura?'readonly':''}><select id="al" ${soloLectura?'style="display:none"':''} aria-label="\u00c1lbum" title="\u00c1lbum">${A.map(a=>`<option value="${a.id}" ${a.id===ed.albumId?'selected':''}>${esc(a.nombre)}</option>`).join('')}</select>
+        <div class="et" ${soloLectura?'style="display:none"':''}><div class="box"><input id="eq" value="${esc(eq)}" placeholder="${esc(resumen())}" autocomplete="off" aria-label="Buscar etiqueta"></div><button class="sec" id="eta" aria-label="Ver etiquetas">${svgI('<path d="M6 9l6 6 6-6"/>',14)}</button><div class="lista" ${verEt?'':'hidden'}>${listaEt()}</div></div>
+        <span class="dd" ${soloLectura&&!ed.tono?'style="display:none"':''}><button class="sec" id="tonb" data-pop="ton" ${modo==='letra'?'disabled title="La tonalidad se cambia en la pesta\u00f1a Acordes"':''}>Tonalidad${act?' \u00b7 <b>'+esc(act)+'</b>':''}</button>${pp('ton','','tonbox')}</span>
+        <span class="acc"><button class="sec" id="no">${soloLectura?'Cerrar':'Cancelar'}</button>${soloLectura?'':'<button id="ok">Guardar canci\u00f3n</button>'}</span></div>
+      <div class="rib" ${plegada?'hidden':''} ${soloLectura?'style="display:none"':''}>
         <div class="gr" data-g="Texto"><select id="ff" title="Tipo de letra">${optsFuente()}</select><span class="dd szb"><input type="text" id="sz" inputmode="decimal" autocomplete="off" placeholder="16" title="Tama\u00f1o del texto donde est\u00e1 el cursor o la selecci\u00f3n"><button class="sec fb" data-pop="sz" title="Lista de tama\u00f1os" aria-label="Lista de tama\u00f1os">${svgI('<path d="M6 9l6 6 6-6"/>',12)}</button></span>${pp('sz',`<div class="menuAa">${TAMS.map(n=>`<button class="fb" data-f="s:${n}">${n}</button>`).join('')}</div>`,'tamb')}${fb('s-','A\u2212','Reducir tama\u00f1o (Ctrl+Mays+&lt;)')}${fb('s+','A+','Aumentar tama\u00f1o (Ctrl+Mays+&gt;)')}
           ${fb('b','<b>B</b>','Negrita (Ctrl+B)')}${fb('i','<i class="bi">I</i>','Cursiva (Ctrl+I)')}${fb('u','<u>U</u>','Subrayado (Ctrl+U)')}
           <button class="sec fb${modoAcorde?' on':''}" data-f="k" title="Acorde: marca los acordes de lo seleccionado. Sin selecci\u00f3n, act\u00edvalo para escribir acordes" aria-label="Acorde" ${modo==='letra'?'disabled':''}><b class="btnk">\u266A</b></button>
@@ -673,8 +676,8 @@ export function abrir(s,alCerrar){
           ${dd('aa',`<button class="sec fb" data-pop="aa" title="May\u00fasculas y min\u00fasculas">Aa</button>`,`<div class="menuAa"><button class="sec fb" data-f="case:up">MAY\u00daSCULAS</button><button class="sec fb" data-f="case:low">min\u00fasculas</button><button class="sec fb" data-f="case:cap">Cada Palabra</button></div>`)}</div>
         <div class="gr" data-g="Herramientas">${fb('undo',svgI(UNDO,16),'Deshacer (Ctrl+Z)')}${fb('redo',svgI(REDO,16),'Rehacer (Ctrl+Y)')}${fb('pincel',svgI(BRUSH,16),'Copiar formato (selecciona, pulsa, selecciona otro y vuelve a pulsar)')}${fb('clear','T<sub>x</sub>','Borrar formato')}<button class="sec" data-bus title="Buscar y reemplazar">${svgI(FIND,16)} Buscar</button></div></div>
       <div class="tabs" role="tablist" aria-label="Hoja"><button class="${modo==='letra'?'':'sec'}" id="ml" role="tab" aria-selected="${modo==='letra'}">Letra</button><button class="${modo==='acordes'?'':'sec'}" id="ma" role="tab" aria-selected="${modo==='acordes'}">Acordes</button>
-        <span class="der"><select id="zm" title="Zoom de la hoja">${[50,75,100,125,150,200].map(n=>`<option value="${n}" ${n===zoom?'selected':''}>${n}%</option>`).join('')}</select><span id="cnt" class="cnt"></span><button class="sec" data-plegar title="${plegada?'Mostrar el t\u00edtulo, el \u00e1lbum y las herramientas':'Ocultar el t\u00edtulo, el \u00e1lbum y las herramientas para tener m\u00e1s espacio'}" aria-label="${plegada?'Mostrar herramientas':'Ocultar herramientas'}">${plegada?'\u25BC':'\u25B2'}</button></span></div>${pops.join('')}</div>
-      <div class="pg" style="--lh:${ed.lh||1.35};zoom:${zoom/100};${cssFuente(fam)?'font-family:'+esc(cssFuente(fam))+';':''}"><div id="le" class="le" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="${modo==='letra'?'Letra':'Acordes'} de la canci\u00f3n">${hojaHtml()}</div></div>`;
+        <span class="der"><select id="zm" title="Zoom de la hoja">${[50,75,100,125,150,200].map(n=>`<option value="${n}" ${n===zoom?'selected':''}>${n}%</option>`).join('')}</select><span id="cnt" class="cnt"></span><button class="sec" data-plegar ${soloLectura?'style="display:none"':''} title="${plegada?'Mostrar el t\u00edtulo, el \u00e1lbum y las herramientas':'Ocultar el t\u00edtulo, el \u00e1lbum y las herramientas para tener m\u00e1s espacio'}" aria-label="${plegada?'Mostrar herramientas':'Ocultar herramientas'}">${plegada?'\u25BC':'\u25B2'}</button></span></div>${pops.join('')}</div>
+      <div class="pg" style="--lh:${ed.lh||1.35};zoom:${zoom/100};${cssFuente(fam)?'font-family:'+esc(cssFuente(fam))+';':''}"><div id="le" class="le" contenteditable="${soloLectura?'false':'true'}" spellcheck="false" role="textbox" ${soloLectura?'aria-readonly="true"':''} aria-multiline="true" aria-label="${modo==='letra'?'Letra':'Acordes'} de la canci\u00f3n">${hojaHtml()}</div></div>`;
     cnt();refTono();marcarBotones();
     if(popAb)colocaPop(popAb);
   };
@@ -735,6 +738,7 @@ export function abrir(s,alCerrar){
       if(modo==='letra')ed.fuente=v;else ed.fuenteA=v;
       ov.querySelector('.pg').style.fontFamily=cssFuente(v)}};
   ov.onkeydown=e=>{
+    if(soloLectura)return;                                  // en solo lectura no hay atajos de edición (copiar con Ctrl+C sigue funcionando)
     const k=e.key.toLowerCase(),ctl=(e.ctrlKey||e.metaKey)&&!e.altKey,enHoja=!e.target.matches('input,select,textarea');
     if(ctl&&!e.shiftKey&&/^[biu]$/.test(k)){if(enHoja){e.preventDefault();fmt(k)}}   // dentro de un campo de texto se deja el atajo del navegador
     else if(ctl&&enHoja&&k==='z'&&!e.shiftKey){e.preventDefault();deshacer()}
@@ -745,7 +749,7 @@ export function abrir(s,alCerrar){
     else if(e.key==='Tab'&&e.target.id==='le'){e.preventDefault();document.execCommand('insertText',false,'    ')}
     else if(e.key==='Enter'&&e.target.id==='eq'){e.preventDefault();const f=filtra()[0];if(f){alterna(f.id,!ed.etiquetas.includes(f.id));eq='';e.target.value='';refEt()}}};
   ov.addEventListener('paste',e=>{
-    if(!e.target.closest('#le'))return;e.preventDefault();
+    if(soloLectura||!e.target.closest('#le'))return;e.preventDefault();
     const cd=e.clipboardData,h=cd.getData('text/html'),r=h?limpiaHtml(h):'';
     pend=null;
     document.execCommand('insertHTML',false,r||esc(cd.getData('text/plain')).replace(/\r?\n/g,'<br>'));
@@ -762,11 +766,12 @@ export function abrir(s,alCerrar){
     if(verEt){verEt=false;ov.querySelector('.lista').hidden=true;eq='';const i=$('#eq',ov);if(i)i.value='';refEt()}
     const t=tg.closest('[id],[data-f],[data-bus],[data-tt],[data-tv],[data-tf],[data-tr],[data-tk],[data-plegar]')||tg,d=t.dataset;leer();
     if(t.id==='ok'){
+      if(soloLectura)return;
       if(!ed.titulo.trim())return alert('Escribe un t\u00edtulo.');
       ed.lineas=recorta(ed.lineas);ed.lineasA=recorta(ed.lineasA);
       ed.letra=ed.lineas.map(plano).join('\n');
       const {id,acordes,...x}=ed;id?guardar('canciones',id,x,false):crear('canciones',x);cerrar();return}
-    if(t.id==='no'){if(snapFull()!==inicial&&!confirm('\u00bfDescartar los cambios?'))return;return cerrar()}
+    if(t.id==='no'){if(!soloLectura&&snapFull()!==inicial&&!confirm('\u00bfDescartar los cambios?'))return;return cerrar()}
     if(d.tt!=null){cambiaTono(+d.tt);return}
     if(d.tv!=null){
       if(ed.tono){
@@ -776,15 +781,16 @@ export function abrir(s,alCerrar){
         refTono();
       }
       return}
-    if(d.tf!=null){ed.tono=ed.tonoAct||ed.tono;refTono();return}
-    if(d.tr!=null){ed.tono='';ed.tonoAct='';refTono();return}
-    if(d.tk!=null){if(!ed.tono){ed.tono=ed.tonoAct=d.tk;refTono()}else irATono(d.tk);return}
+    if(d.tf!=null){if(soloLectura)return;ed.tono=ed.tonoAct||ed.tono;refTono();return}
+    if(d.tr!=null){if(soloLectura)return;ed.tono='';ed.tonoAct='';refTono();return}
+    if(d.tk!=null){if(soloLectura&&!ed.tono)return;if(!ed.tono){ed.tono=ed.tonoAct=d.tk;refTono()}else irATono(d.tk);return}
     if(d.plegar!=null){plegada=!plegada;ov.querySelector('.rib').hidden=plegada;ov.classList.toggle('plegada',plegada);t.textContent=plegada?'\u25BC':'\u25B2';t.setAttribute('aria-label',plegada?'Mostrar herramientas':'Ocultar herramientas');t.title=plegada?'Mostrar el t\u00edtulo, el \u00e1lbum y las herramientas':'Ocultar el t\u00edtulo, el \u00e1lbum y las herramientas para tener m\u00e1s espacio';return}
+    if(d.f&&soloLectura)return;
     if(d.f){const [p,...r]=d.f.split(':'),v=r.join(':');
       if(p==='c'&&v!=='auto'){uc=v;ov.querySelectorAll('[data-pop="c"] .cb').forEach(x=>x.style.background=uc)}
       if(p==='h'&&v!=='none'){uh=v;ov.querySelectorAll('[data-pop="h"] .cb').forEach(x=>x.style.background=uh)}
       cierraPop();return fmt(p,v)}
-    else if(d.bus!=null)return buscar();
+    else if(d.bus!=null)return soloLectura?null:buscar();
     else if(t.id==='ml'||t.id==='ma'){modo=t.id==='ml'?'letra':'acordes';modoAcorde=false;pend=null;rango=null;popAb=null}
     else return;
     pinta();

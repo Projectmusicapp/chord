@@ -1,5 +1,5 @@
 // ===== PANTALLA: ESCALAS (personas, equipos por día, modo edición) =====
-import {$,esc,guardar,crear,escuchar,eliminar,vistas,ic,modal} from "./base.js";
+import {$,esc,guardar,crear,escuchar,eliminar,vistas,ic,modal,puedeEditar} from "./base.js";
 
 const st=document.createElement('style');
 st.textContent=`[data-vista=escalas] .c2{margin-bottom:22px}
@@ -28,7 +28,8 @@ st.textContent=`[data-vista=escalas] .c2{margin-bottom:22px}
 .pbar .pt{font-size:20px;font-weight:800}.pbar .pt small{font-size:13px;font-weight:700;color:var(--gris);margin-left:6px}
 .pbar svg{flex:none;transition:transform .2s}.pbar[aria-expanded=false] svg{transform:rotate(-90deg)}
 .pop .bq{width:100%;margin-bottom:4px}
-.pop label[hidden],.pop .sinres[hidden]{display:none}`;
+.pop label[hidden],.pop .sinres[hidden]{display:none}
+.mem.ro,.mem.ro:hover{cursor:default;opacity:1;filter:none;color:var(--tx);border-color:var(--linea);background:transparent}`;
 document.head.append(st);
 
 let P=[],X=[],el=null,edit=false,abre=null,man=null,perAbierto=true,busq='',abrePrev=null;
@@ -81,7 +82,7 @@ escuchar('personas',l=>{
 
 escuchar('escalas',l=>{
   X=l.sort((a,b)=>(a.orden||0)-(b.orden||0));
-  if(!l.length)[['sabado','S\u00e1bado'],['domingo','Domingo']].forEach(([id,n],o)=>guardar('escalas',id,{nombre:n,orden:o,equipos:equipos()}));
+  if(!l.length&&puedeEditar())[['sabado','S\u00e1bado'],['domingo','Domingo']].forEach(([id,n],o)=>guardar('escalas',id,{nombre:n,orden:o,equipos:equipos()}));
   pintar();
 });
 
@@ -106,13 +107,13 @@ function pintar(){
       const miembrosOrdenados=ordenarMiembros(q.miembros);
       const n=q.miembros.filter(m=>P.some(x=>x.id===m)).length;
       return `<div class="tm"><div class="th">${edit?`<input class="inl" data-en="${k}" value="${esc(q.nombre)}" aria-label="Nombre del equipo"><button class="ic rj" data-ex="${k}" aria-label="Eliminar ${esc(q.nombre)}" title="Eliminar equipo">${ic('trs',15)}</button>`:`<b>${esc(q.nombre)}</b>${n?`<span class="cuenta">${n}</span>`:''}`}</div>`
-        +`<button class="mem" data-el="${k}" aria-expanded="${abre===k}" aria-label="${esc(q.nombre)} de ${esc(d.nombre)}: ${n?n+(n>1?' personas. Cambiar':' persona. Cambiar'):'elegir personas'}">${miembrosOrdenados.map(m=>{const p=P.find(x=>x.id===m);return p?`<span class="mrow"><span>${esc(p.nombre)}</span><small>${esc(p.ocupacion||'')}</small></span>`:''}).join('')||`<em>${ic('pls',15)} Elegir personas</em>`}</button>`
+        +`<button class="mem${puedeEditar()?'':' ro'}" ${puedeEditar()?'':'disabled'} data-el="${k}" aria-expanded="${abre===k}" aria-label="${esc(q.nombre)} de ${esc(d.nombre)}: ${n?n+(n>1?' personas. Cambiar':' persona. Cambiar'):'elegir personas'}">${miembrosOrdenados.map(m=>{const p=P.find(x=>x.id===m);return p?`<span class="mrow"><span>${esc(p.nombre)}</span><small>${esc(p.ocupacion||'')}</small></span>`:''}).join('')||(puedeEditar()?`<em>${ic('pls',15)} Elegir personas</em>`:'<em>Sin personas</em>')}</button>`
         +(abre===k?`<div class="pop"><input type="search" class="bq" data-pq="${k}" value="${esc(busq)}" placeholder="Escribe para buscar..." aria-label="Buscar persona" autocomplete="off">${P.map(p=>`<label data-n="${esc(norm(p.nombre+' '+(p.ocupacion||'')))}"><input type="checkbox" data-pk="${k}" value="${p.id}" ${q.miembros.includes(p.id)?'checked':''}> ${esc(p.nombre)} <small>${esc(p.ocupacion||'')}</small></label>`).join('')||'<p class="vac">Primero a\u00f1ade personas con el bot\u00f3n \u00abGestionar\u00bb.</p>'}<p class="vac sinres" hidden>Nadie coincide con la b\u00fasqueda.</p><button data-cl style="margin-top:6px;">Listo</button></div>`:'')+'</div>';
     }).join('')+'</div></div>').join('');
 
   // Secciones ordenadas: Personas ARRIBA, Escalas por d\u00eda ABAJO
-  el.innerHTML=`<section class="c2"><div class="ch2"><h1 style="font-size:26px">Escalas</h1><div class="mb"><button class="${edit?'':'sec'}" id="ed" aria-pressed="${edit}">${edit?'Listo':ic('edt',16)+' Editar'}</button><button id="da">${ic('pls',16)} A\u00f1adir d\u00eda</button></div></div>${dias||'<p class="vac">A\u00fan no hay d\u00edas. Pulsa \u00abA\u00f1adir d\u00eda\u00bb.</p>'}</section>`
-  +`<section class="c2"><div class="ch2"><button class="pbar" id="tp" aria-expanded="${perAbierto}" aria-controls="pg"><span class="pt">Personas<small>${P.length}</small></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><button class="sec" id="gp">${ic('usr',16)} Gestionar personas</button></div>`
+  el.innerHTML=`<section class="c2"><div class="ch2"><h1 style="font-size:26px">Escalas</h1>${puedeEditar()?`<div class="mb"><button class="${edit?'':'sec'}" id="ed" aria-pressed="${edit}">${edit?'Listo':ic('edt',16)+' Editar'}</button><button id="da">${ic('pls',16)} A\u00f1adir d\u00eda</button></div>`:''}</div>${dias||'<p class="vac">A\u00fan no hay d\u00edas. Pulsa \u00abA\u00f1adir d\u00eda\u00bb.</p>'}</section>`
+  +`<section class="c2"><div class="ch2"><button class="pbar" id="tp" aria-expanded="${perAbierto}" aria-controls="pg"><span class="pt">Personas<small>${P.length}</small></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>${puedeEditar()?`<button class="sec" id="gp">${ic('usr',16)} Gestionar personas</button>`:''}</div>`
     +(perAbierto?`<div class="pgrid" id="pg">`+(P.map(p=>`<div class="per"><span class="av${(p.ocupacion||'').toLowerCase().includes('voz')?' voz':''}" aria-hidden="true">${esc(ini(p.nombre))}</span><div><b>${esc(p.nombre)}</b><small>${esc(p.ocupacion||'Sin ocupaci\u00f3n')}</small></div></div>`).join('')||'<p class="vac">A\u00fan no hay personas. Pulsa \u00abGestionar personas\u00bb para a\u00f1adirlas.</p>')+`</div>`:'')
     +`</section>`;
 
@@ -135,6 +136,7 @@ function clic(e){
   const t=e.target.closest('button,[data-el]');
   if(abre&&!e.target.closest('.tm')){abre=null;pintar()}
   if(!t)return;const d=t.dataset,dia=id=>X.find(x=>x.id===id);
+  if(!puedeEditar()&&t.id!=='tp')return;   // el rol «usuario» solo mira: lo único que puede hacer es abrir o cerrar el panel de Personas
   if(t.id==='gp')gestionar();
   else if(t.id==='tp'){perAbierto=!perAbierto;pintar()}
   else if(t.id==='ed'){edit=!edit;abre=null;pintar()}
