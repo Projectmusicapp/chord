@@ -1,46 +1,55 @@
 // =====================================================================
-//  USUARIOS.JS  ·  Cuentas y permisos (exactamente 3 roles, con ministerios)
+//  USUARIOS.JS  ·  Cuentas y permisos (4 niveles, con misiones)
 //
 //  Las cuentas usan Firebase Authentication (correo + contraseña, ver
 //  base.js): el id de cada cuenta aquí es el uid que le da Firebase Auth,
 //  no un id de Firestore cualquiera. El documento en «usuarios» solo
-//  guarda los datos propios de la app (rol, nombre, a qué ministerio
+//  guarda los datos propios de la app (rol, nombre, a qué misión
 //  pertenece...); la contraseña la maneja Firebase, nunca se guarda aquí.
 //
-//  Roles:
-//   admin ..... control total: biblioteca general, puede ocultar álbumes
-//               de la biblioteca general, y crear cuentas de cualquier
-//               rol (otros admin, ministerios, usuarios). Todas las
-//               cuentas admin tienen el mismo poder (no hay «el admin
-//               original» y «sus ayudantes»: son todas iguales).
-//   ministerio  un equipo de una MISIÓN (misión y ministerio son lo mismo).
-//               Ve la biblioteca general (lo que pone el admin) sin poder
-//               editarla. Tiene la biblioteca privada, el calendario, las
-//               escalas y los repertorios de SU misión (los comparte con las
-//               demás cuentas de esa misión). Puede crear cuentas «ministerio»
-//               y «usuario» para su misma misión.
-//   usuario ... solo ve (su misión + la biblioteca general). No crea
-//               ni edita nada. También puede llegar aquí por autorregistro
-//               (ver login.js): esas cuentas quedan con requiereVerificacion
-//               = true hasta que confirman su correo.
+//  Niveles (campo «rol», y «editorDe» para el Editor):
+//   admin ...... control total: biblioteca general, puede ocultar álbumes
+//                de la biblioteca general, crear cuentas de cualquier nivel
+//                y cambiar el nivel de cualquier cuenta (incluso degradar a
+//                otro Administrador a Editor). Solo este nivel cambia niveles.
+//   editor ..... solo se crea desde Configuración (nunca por autorregistro).
+//     editorDe:'admin'   Editor del administrador: hace todo lo que el
+//                        Administrador, menos editar/eliminar a un Administrador
+//                        ni crear Administradores. Trabaja en el espacio general.
+//     editorDe:'mision'  Editor de misión: hace todo lo que una cuenta Misión,
+//                        menos editar/eliminar cuentas Misión. Solo ve cuentas de
+//                        SU misión. No cambia la misión de otras cuentas.
+//                        (Ningún Editor elimina a otro Editor, pero sí lo edita.)
+//   mision ..... un equipo de una MISIÓN. Ve la biblioteca general sin poder
+//                editarla. Tiene la biblioteca privada, el calendario, las
+//                escalas y los repertorios de SU misión. Puede crear cuentas
+//                «mision», «editor de misión» y «usuario» para su misma misión.
+//   usuario .... solo ve (su misión + la biblioteca general). No crea ni edita
+//                nada. También puede llegar aquí por autorregistro (ver
+//                login.js): esas cuentas quedan con requiereVerificacion = true
+//                hasta que confirman su correo.
 //
-//  Las misiones las crea el Administrador en la pantalla «Misiones» (ver
-//  misiones.js). Cada cuenta ministerio/usuario guarda en «ministerioId» el
+//  Las misiones las crea el Administrador (o su Editor) en la pantalla
+//  «Misiones» (ver misiones.js). Cada cuenta de misión guarda en «misionId» el
 //  id de su misión, y los datos de cada misión (álbumes propios, calendario,
 //  escalas...) se separan con ese mismo campo (ver conAmbito y ambitoActual
-//  en base.js). «creadoEn» (fecha en milisegundos) se usa para la sección
-//  «Novedades» de Inicio.
+//  en base.js). «creadoEn» (fecha en milisegundos) se usa para «Novedades».
 //
-//  Una cuenta creada por un Administrador o un Ministerio (desde «Nueva
-//  cuenta») queda con requiereVerificacion:false: se confía en quien la
-//  dio de alta. Solo el autorregistro público exige verificar el correo.
+//  Una cuenta creada desde «Nueva cuenta» queda con requiereVerificacion:false:
+//  se confía en quien la dio de alta. Solo el autorregistro exige verificar.
 // =====================================================================
-import {$,esc,guardar,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,puedeEditar,configActual,hoyLargo,auth,cambiarMiClave,crearCuentaAuth,crearCuentaComoAdmin,enviarVerificacion} from "./base.js";
+import {$,esc,guardar,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,esAdministrador,esEditorAdmin,esEditorMision,puedeEditar,configActual,hoyLargo,auth,cambiarMiClave,crearCuentaAuth,crearCuentaComoAdmin,enviarVerificacion} from "./base.js";
 import {ventana as abrirRespaldo} from "./respaldo.js";
 import {E,alCambiar} from "./estado.js";
 import {misionesCargadas,alCambiarMisiones,listaMisiones,misionPorId,etiquetaMision} from "./misiones.js";
 
-const ROLES={admin:'Administrador',ministerio:'Ministerio',usuario:'Usuario (solo ver)'};
+// NIVELES: los 5 «niveles» que se pueden elegir (el Editor tiene dos variantes).
+const NIVELES={admin:'Administrador','editor-admin':'Editor del administrador','editor-mision':'Editor de misión',mision:'Misión',usuario:'Usuario (solo ver)'};
+const nivelDe=u=>u.rol==='editor'?(u.editorDe==='admin'?'editor-admin':'editor-mision'):(u.rol||'usuario');
+const etiquetaRol=u=>NIVELES[nivelDe(u)]||u.rol;
+const necesitaMision=n=>n!=='admin'&&n!=='editor-admin';        // estos dos trabajan en el espacio general
+// datosDeNivel: los campos que se guardan en la cuenta para cada nivel
+const datosDeNivel=n=>({admin:{rol:'admin',editorDe:null},'editor-admin':{rol:'editor',editorDe:'admin'},'editor-mision':{rol:'editor',editorDe:'mision'},mision:{rol:'mision',editorDe:null},usuario:{rol:'usuario',editorDe:null}})[n];
 
 const st=document.createElement('style');
 st.textContent=`header .menu-usuario{position:relative;margin-left:auto}
@@ -104,49 +113,63 @@ escuchar('usuarios',l=>{
 alCambiarMisiones(()=>{if(el)pintar();pintarInicio()});   // si cambian las misiones, se vuelven a dibujar los nombres
 
 // ---------- A qué misión pertenecen las cuentas ----------
-// miMision: la misión de esta cuenta (su «ministerioId»). El Administrador no tiene (null: trabaja en el espacio general).
-const miMision=u=>u.rol==='admin'?null:(u.ministerioId||null);
-const esMinisterioTier=u=>u.rol==='ministerio';
+// miMision: la misión de esta cuenta (su «misionId»). El Administrador y su Editor no tienen (null: trabajan en el espacio general).
+const nivelAdminU=u=>u.rol==='admin'||esEditorAdmin(u);          // cuentas con poder de Administrador (él y su Editor)
+const miMision=u=>nivelAdminU(u)?null:(u.misionId||null);
 // misionesDisponibles: para el selector de misión del autorregistro (ver login.js). Ya vienen ordenadas por país.
 export function misionesDisponibles(){
-  return listaMisiones().map(m=>({id:m.id,nombre:m.nombre,pais:m.pais||''}));
+  return listaMisiones().map(m=>({id:m.id,nombre:m.nombre,pais:m.pais||'',codigo:m.codigo||''}));
 }
 // misionDe: el texto de la misión de una cuenta, para mostrarlo en pantalla.
 function misionDe(u){
-  if(u.rol==='admin')return '';
-  if(!u.ministerioId)return 'Sin misión';
-  const m=misionPorId(u.ministerioId);
+  if(nivelAdminU(u))return '';
+  if(!u.misionId)return 'Sin misión';
+  const m=misionPorId(u.misionId);
   return m?etiquetaMision(m):'(misión eliminada)';
 }
 
 // ---------- Primera cuenta / autorregistro (los llama login.js) ----------
 export async function crearPrimerAdmin(nombre,correo,clave){
   const cred=await crearCuentaAuth(correo,clave);
-  await guardar('usuarios',cred.user.uid,{nombre:nombre||correo,correo,rol:'admin',ministerioId:null,activo:true,creadoPor:null,requiereVerificacion:false,creadoEn:Date.now()});
+  await guardar('usuarios',cred.user.uid,{nombre:nombre||correo,correo,rol:'admin',editorDe:null,misionId:null,activo:true,creadoPor:null,requiereVerificacion:false,creadoEn:Date.now()});
   return cred.user;
 }
-export async function autorregistrar(nombre,correo,clave,ministerioId){
+export async function autorregistrar(nombre,correo,clave,misionId){
   const cred=await crearCuentaAuth(correo,clave);
   await enviarVerificacion(cred.user);
-  await guardar('usuarios',cred.user.uid,{nombre:nombre||correo,correo,rol:'usuario',ministerioId,activo:true,creadoPor:null,requiereVerificacion:true,creadoEn:Date.now()});
+  await guardar('usuarios',cred.user.uid,{nombre:nombre||correo,correo,rol:'usuario',editorDe:null,misionId,activo:true,creadoPor:null,requiereVerificacion:true,creadoEn:Date.now()});
   return cred.user;
 }
 
+// rolesCreables: los niveles que puede crear cada tipo de cuenta
 function rolesCreables(actor){
-  if(esNivelAdmin())return [['admin','Administrador (como tú)'],['ministerio','Ministerio'],['usuario','Usuario (solo ver)']];
-  if(esMinisterioTier(actor))return [['ministerio','Ministerio (de tu misión)'],['usuario','Usuario (solo ver)']];
+  const n=k=>[k,NIVELES[k]];
+  if(actor.rol==='admin')return ['admin','editor-admin','editor-mision','mision','usuario'].map(n);
+  if(esEditorAdmin(actor))return ['editor-admin','editor-mision','mision','usuario'].map(n);   // no crea Administradores
+  if(actor.rol==='mision')return [['mision','Misión (de tu misión)'],['editor-mision','Editor de misión (de tu misión)'],['usuario','Usuario (solo ver)']];
+  if(esEditorMision(actor))return [['editor-mision','Editor de misión (de tu misión)'],['usuario','Usuario (solo ver)']];   // no crea cuentas Misión
   return [];
 }
 function cuentasVisibles(actor){
-  if(esNivelAdmin())return U;
-  const mision=miMision(actor);
-  return mision?U.filter(u=>u.ministerioId===mision):[];
+  if(nivelAdminU(actor))return U;
+  const mision=miMision(actor);                  // una misión nunca ve cuentas de otras misiones ni de Administradores
+  return mision?U.filter(u=>u.misionId===mision&&!nivelAdminU(u)):[];
 }
-function puedeGestionar(u,actor){
-  if(u.id===actor.id)return false;              // su propia cuenta no se gestiona desde aquí
-  if(esNivelAdmin())return true;
+// puedeEditarCuenta: ¿se muestra el botón «Editar» de esta cuenta?
+function puedeEditarCuenta(u,actor){
+  if(u.id===actor.id)return false;              // su propia cuenta no se gestiona desde aquí (usa «Mi cuenta»)
+  if(actor.rol==='admin')return true;
+  if(esEditorAdmin(actor))return u.rol!=='admin';   // el Editor del administrador no edita a los Administradores
   const mision=miMision(actor);
-  return esMinisterioTier(actor)&&!!mision&&u.ministerioId===mision;
+  if(!mision||u.misionId!==mision||nivelAdminU(u))return false;
+  if(actor.rol==='mision')return true;
+  return u.rol!=='mision';                       // el Editor de misión no edita a las cuentas Misión
+}
+// puedeEliminarCuenta: ¿se muestra el botón de eliminar? Ningún Editor elimina a otro Editor.
+function puedeEliminarCuenta(u,actor){
+  if(!puedeEditarCuenta(u,actor))return false;
+  if(actor.rol==='admin'||actor.rol==='mision')return true;
+  return u.rol!=='editor';
 }
 
 // ---------- Menú de usuario en la cabecera: nombre, Mi cuenta, Configuración y Salir ----------
@@ -237,23 +260,23 @@ function pintar(){
 }
 
 function fila(u,actor){
-  const gestiona=puedeGestionar(u,actor);
+  const edita=puedeEditarCuenta(u,actor),elimina=puedeEliminarCuenta(u,actor);
   const tuya=u.id===actor.id;
   const pendiente=u.requiereVerificacion&&!u.emailVerified&&u.id!==actor.id;
-  const sub=[ROLES[u.rol]||u.rol,misionDe(u)].filter(Boolean).join(' · ');
+  const sub=[etiquetaRol(u),misionDe(u)].filter(Boolean).join(' · ');
   return `<div class="ufila${u.activo===false?' inactiva':''}">
     <div class="un"><b>${esc(u.nombre||u.correo)}${tuya?' (tú)':''}</b><small>${esc(u.correo||'')}${u.activo===false?' · Desactivada':''}</small></div>
     <span class="rolchip">${esc(sub)}</span>
-    ${gestiona?`<div class="mb2"><button class="sec" data-ed="${u.id}">${ic('edt',15)} Editar</button><button class="ic rj" data-el="${u.id}" aria-label="Eliminar a ${esc(u.nombre||u.correo)}" title="Eliminar">${ic('trs',16)}</button></div>`:''}
+    ${edita?`<div class="mb2"><button class="sec" data-ed="${u.id}">${ic('edt',15)} Editar</button>${elimina?`<button class="ic rj" data-el="${u.id}" aria-label="Eliminar a ${esc(u.nombre||u.correo)}" title="Eliminar">${ic('trs',16)}</button>`:''}</div>`:''}
   </div>`;
 }
 
 function clic(e){
   const b=e.target.closest('button');if(!b)return;const d=b.dataset;
   if(d.nu!=null)formNuevo();
-  else if(d.ed)formEditar(U.find(x=>x.id===d.ed));
+  else if(d.ed){const u=U.find(x=>x.id===d.ed);if(u&&puedeEditarCuenta(u,sesion()))formEditar(u)}
   else if(d.el){
-    const u=U.find(x=>x.id===d.el);if(!u)return;
+    const u=U.find(x=>x.id===d.el);if(!u||!puedeEliminarCuenta(u,sesion()))return;
     if(u.rol==='admin'&&U.filter(x=>x.rol==='admin').length<=1)return alert('Debe quedar al menos una cuenta de Administrador.');
     if(confirm('¿Eliminar la cuenta "'+(u.nombre||u.correo)+'"? Dejará de verse en la app, pero su acceso de inicio de sesión no queda totalmente revocado (eso requiere la consola de Firebase). Para solo quitarle el acceso, mejor desactívala desde «Editar».')){
       eliminar('usuarios',u,'la cuenta "'+(u.nombre||u.correo)+'"',true);
@@ -270,7 +293,7 @@ const ERRORES_AUTH={
 function formNuevo(){
   const actor=sesion(),roles=rolesCreables(actor);
   if(!roles.length)return;
-  const elegirMision=esNivelAdmin();                // el admin elige la misión; un ministerio crea siempre dentro de la suya
+  const elegirMision=esNivelAdmin();                // el Administrador y su Editor eligen la misión; una cuenta de misión crea siempre dentro de la suya
   const misiones=listaMisiones();
   const o=modal(`<div class="mh"><h2>Nueva cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" autocomplete="off"></label>
@@ -281,23 +304,24 @@ function formNuevo(){
     <p class="error" role="alert" hidden></p>
     <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Crear</button></div>`);
   const actualizaCampos=()=>{
-    const wm=$('#fmw',o);if(wm)wm.hidden=$('#fr',o).value==='admin';   // un Administrador no pertenece a ninguna misión
+    const wm=$('#fmw',o);if(wm)wm.hidden=!necesitaMision($('#fr',o).value);   // Administrador y su Editor no pertenecen a ninguna misión
   };
   actualizaCampos();
   $('#fr',o).onchange=actualizaCampos;
   const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
   const aceptar=async()=>{
-    const nombre=$('#fn',o).value.trim(),correo=$('#fe',o).value.trim(),clave=$('#fc',o).value,rol=$('#fr',o).value;
+    const nombre=$('#fn',o).value.trim(),correo=$('#fe',o).value.trim(),clave=$('#fc',o).value,nivel=$('#fr',o).value;
     if(!correo||!clave)return err('Escribe correo y contraseña.');
-    let ministerioId=null;                          // ministerioId = el id de la misión (null para un Administrador)
-    if(rol!=='admin'){
-      ministerioId=elegirMision?($('#fm',o).value||''):miMision(actor);
-      if(!ministerioId)return err('Elige la misión a la que pertenece, o crea una misión primero.');
+    if(!roles.some(([v])=>v===nivel))return err('Ese nivel no está permitido para tu cuenta.');
+    let misionId=null;                              // misionId = el id de la misión (null para el Administrador y su Editor)
+    if(necesitaMision(nivel)){
+      misionId=elegirMision?($('#fm',o).value||''):miMision(actor);
+      if(!misionId)return err('Elige la misión a la que pertenece, o crea una misión primero.');
     }
     const btn=$('#ok',o);btn.disabled=true;
     try{
       const uid=await crearCuentaComoAdmin(correo,clave);
-      await guardar('usuarios',uid,{nombre:nombre||correo,correo,rol,ministerioId,activo:true,creadoPor:actor.id,requiereVerificacion:false,creadoEn:Date.now()});
+      await guardar('usuarios',uid,{nombre:nombre||correo,correo,...datosDeNivel(nivel),misionId,activo:true,creadoPor:actor.id,requiereVerificacion:false,creadoEn:Date.now()});
       o.remove();aviso('Cuenta creada.');
     }catch(ex){
       btn.disabled=false;
@@ -310,32 +334,50 @@ function formNuevo(){
 
 function formEditar(u){
   if(!u)return;
-  const cambiaMision=esNivelAdmin()&&u.rol!=='admin';           // solo el admin pasa una cuenta a otra misión
-  const sinMision=!u.ministerioId||!misionPorId(u.ministerioId);
+  const cambiaNivel=esAdministrador();                          // SOLO el Administrador cambia niveles
+  const cambiaMision=esNivelAdmin();                            // el Administrador y su Editor pasan una cuenta a otra misión (una cuenta de misión no)
+  const nivelAct=nivelDe(u);
+  const sinMision=!u.misionId||!misionPorId(u.misionId);
   const o=modal(`<div class="mh"><h2>Editar cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" value="${esc(u.nombre||'')}" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Correo<input id="fe" value="${esc(u.correo||'')}" disabled></label>
-    ${cambiaMision?`<label class="fl2" style="margin-bottom:12px">Misión<select id="fm">${sinMision?'<option value="">(elige una misión)</option>':''}${listaMisiones().map(m=>`<option value="${m.id}" ${m.id===u.ministerioId?'selected':''}>${esc(etiquetaMision(m))}</option>`).join('')}</select></label>`:''}
+    ${cambiaNivel?`<label class="fl2" style="margin-bottom:12px">Nivel<select id="fr">${Object.entries(NIVELES).map(([v,t])=>`<option value="${v}" ${v===nivelAct?'selected':''}>${esc(t)}</option>`).join('')}</select></label>`:''}
+    ${cambiaMision?`<label class="fl2" id="fmw" style="margin-bottom:12px">Misión<select id="fm">${sinMision?'<option value="">(elige una misión)</option>':''}${listaMisiones().map(m=>`<option value="${m.id}" ${m.id===u.misionId?'selected':''}>${esc(etiquetaMision(m))}</option>`).join('')}</select></label>`:''}
     <p style="margin:0 0 12px;color:var(--gris);font-size:13.5px">La contraseña solo la cambia cada cuenta desde el botón «Mi cuenta» de su propia sesión. El correo no se puede cambiar aquí.</p>
     <label class="chk" style="margin:2px 0 14px"><input type="checkbox" id="fa" ${u.activo===false?'':'checked'}> Cuenta activa (puede iniciar sesión)</label>
     <p class="error" role="alert" hidden></p>
     <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Guardar</button></div>`);
+  const nivelElegido=()=>cambiaNivel?$('#fr',o).value:nivelAct;
+  const actualizaCampos=()=>{const wm=$('#fmw',o);if(wm)wm.hidden=!necesitaMision(nivelElegido())};
+  actualizaCampos();
+  if(cambiaNivel)$('#fr',o).onchange=actualizaCampos;
   const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
   const aceptar=()=>{
-    const nombre=$('#fn',o).value.trim(),activo=$('#fa',o).checked;
+    const nombre=$('#fn',o).value.trim(),activo=$('#fa',o).checked,nivel=nivelElegido();
     const cambios={nombre:nombre||u.correo,activo};
-    if(cambiaMision){const v=$('#fm',o).value;if(v)cambios.ministerioId=v}
+    const cambioNivel=nivel!==nivelAct;
+    if(cambioNivel){
+      if(u.rol==='admin'&&!confirm('«'+(u.nombre||u.correo)+'» dejará de ser Administrador y pasará a «'+NIVELES[nivel]+'». ¿Continuar?'))return;
+      Object.assign(cambios,datosDeNivel(nivel));
+    }
+    if(!necesitaMision(nivel)){
+      if(cambioNivel)cambios.misionId=null;         // pasa al espacio general
+    }else if(cambiaMision){
+      const v=$('#fm',o).value;
+      if(!v)return err('Elige la misión de esta cuenta.');
+      cambios.misionId=v;
+    }
     guardar('usuarios',u.id,cambios);
     o.remove();aviso('Cambios guardados.');
   };
   o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.id==='ok')aceptar()};
-  o.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();aceptar()}};
+  o.onkeydown=e=>{if(e.key==='Enter'&&e.target.tagName!=='SELECT'){e.preventDefault();aceptar()}};
 }
 
 // ---------- Pantalla de Inicio: bienvenida, Novedades y accesos rápidos ----------
-// Cuentas: mismo alcance que la pantalla Usuarios (el Administrador ve todo, un Ministerio
-// solo su propio equipo). Canciones: las mismas que ya se ven en Canciones (E.canciones de
-// estado.js, que respeta la biblioteca general + la privada del ministerio).
+// Cuentas: mismo alcance que la pantalla Usuarios (el Administrador y su Editor ven todo, una Misión
+// o su Editor solo su propio equipo). Canciones: las mismas que ya se ven en Canciones (E.canciones de
+// estado.js, que respeta la biblioteca general + la privada de la misión).
 let elInicio=null;
 
 function tiempoRelativo(ms){
@@ -351,15 +393,15 @@ function tiempoRelativo(ms){
 
 // contextoInicio: qué mostrar en el chip de bienvenida y en la tarjeta «Tu misión»/«Espacio».
 function contextoInicio(actor){
-  if(actor.rol==='admin')return{
-    chip:'Administrador · Espacio General',
+  if(nivelAdminU(actor))return{
+    chip:etiquetaRol(actor)+' · Espacio General',
     espacioTitulo:'Espacio',
     espacioSub:'General. Desde el menú de tu cuenta puedes gestionar las cuentas, las misiones y la configuración.'
   };
-  const m=misionPorId(actor.ministerioId);
-  const nombreM=m?m.nombre:(actor.ministerioId?'(misión eliminada)':'Sin misión');
+  const m=misionPorId(actor.misionId);
+  const nombreM=m?m.nombre:(actor.misionId?'(misión eliminada)':'Sin misión');
   const paisM=m&&m.pais?' · '+m.pais:'';
-  return{chip:(ROLES[actor.rol]||actor.rol)+paisM,espacioTitulo:'Tu misión',espacioSub:nombreM+paisM};
+  return{chip:etiquetaRol(actor)+paisM,espacioTitulo:'Tu misión',espacioSub:nombreM+paisM};
 }
 
 function novedades(){
@@ -368,7 +410,7 @@ function novedades(){
     tipo:'cuenta',
     creadoEn:u.creadoEn||0,
     titulo:u.nombre||u.correo,
-    sub:[ROLES[u.rol]||u.rol,misionDe(u)].filter(Boolean).join(' · ')
+    sub:[etiquetaRol(u),misionDe(u)].filter(Boolean).join(' · ')
   }));
   const canciones=E.canciones.map(c=>({
     tipo:'cancion',

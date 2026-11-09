@@ -9,8 +9,15 @@ const db=getFirestore(app);
 export const auth=getAuth(app);
 export const $=(s,r=document)=>r.querySelector(s);
 export const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-export const escuchar=(col,fn,alError)=>onSnapshot(collection(db,col),s=>fn(s.docs.map(d=>({...d.data(),id:d.id}))),alError||(e=>console.error('No se pudo leer «'+col+'»:',e)));   // alError (opcional): qué hacer si falla la lectura
-export const escucharDoc=(col,id,fn)=>onSnapshot(doc(db,col,id),s=>fn(s.exists()?{...s.data(),id:s.id}:null));
+// compat: datos guardados antes del cambio de nombre («ministerioId» -> «misionId», rol «ministerio» -> «mision»)
+// se leen ya con los nombres nuevos.
+const compat=d=>{
+  if(d.ministerioId!==undefined&&d.misionId===undefined)d={...d,misionId:d.ministerioId};
+  if(d.rol==='ministerio')d={...d,rol:'mision'};
+  return d;
+};
+export const escuchar=(col,fn,alError)=>onSnapshot(collection(db,col),s=>fn(s.docs.map(d=>compat({...d.data(),id:d.id}))),alError||(e=>console.error('No se pudo leer «'+col+'»:',e)));   // alError (opcional): qué hacer si falla la lectura
+export const escucharDoc=(col,id,fn)=>onSnapshot(doc(db,col,id),s=>fn(s.exists()?compat({...s.data(),id:s.id}):null));
 
 // ===== AUTENTICACIÓN (Firebase Authentication: correo + contraseña) =====
 export const alCambiarAuth=fn=>onAuthStateChanged(auth,fn);
@@ -39,40 +46,51 @@ export async function crearCuentaComoAdmin(correo,clave){
 
 // ===== SESIÓN (quién usa la app ahora mismo) =====
 // La arma login.js (con establecerSesion) combinando la cuenta de Firebase Authentication
-// con su documento en Firestore (rol, ministerioId, nombre...).
+// con su documento en Firestore (rol, misionId, nombre...).
+//
+// Roles: admin · editor · mision · usuario
+//  - «editor» siempre trae editorDe: 'admin' (Editor del administrador: mismo poder que el
+//    Administrador, trabaja en el espacio general) o 'mision' (Editor de misión: mismo poder
+//    que una cuenta Misión, trabaja en SU misión, guardada en misionId).
+//  - Si un editor no trae editorDe, se trata como Editor de misión (lo más restringido).
 let usuarioActual=null;
 export const sesion=()=>usuarioActual;
 export function establecerSesion(u){usuarioActual=u}
-export const esNivelAdmin=()=>{const u=usuarioActual;return !!u&&u.rol==='admin'};
+export const esEditorAdmin=u=>!!u&&u.rol==='editor'&&u.editorDe==='admin';
+export const esEditorMision=u=>!!u&&u.rol==='editor'&&u.editorDe!=='admin';
+// esNivelAdmin: poder de Administrador (el Administrador y su Editor).
+export const esNivelAdmin=()=>{const u=usuarioActual;return !!u&&(u.rol==='admin'||esEditorAdmin(u))};
+// esAdministrador: SOLO las cuentas «Administrador» (no su Editor). Cambiar niveles es solo de ellas.
+export const esAdministrador=()=>{const u=usuarioActual;return !!u&&u.rol==='admin'};
 // puedeEditar: todos los roles pueden crear/editar algo EXCEPTO «usuario» (solo ve).
 export const puedeEditar=()=>{const u=usuarioActual;return !!u&&u.rol!=='usuario'};
 
 // ===== ÁMBITO: el «espacio» de una misión (su propio calendario, escalas, canciones...) =====
-// «Misión» y «ministerio» son lo mismo. null = el espacio general/base (el del Administrador,
-// que siempre trabaja ahí). Las cuentas «ministerio» y «usuario» trabajan en el espacio de SU
-// misión: su campo ministerioId guarda el id de la misión (se crean en la pantalla Misiones).
+// null = el espacio general/base (el del Administrador y su Editor, que siempre trabajan ahí).
+// Las cuentas Misión, Editor de misión y Usuario trabajan en el espacio de SU misión: su campo
+// misionId guarda el id de la misión (se crean en la pantalla Misiones).
 export function ambitoActual(){
   const u=usuarioActual;if(!u)return null;
-  if(u.rol==='admin')return null;
-  return u.ministerioId||'sin-mision';           // una cuenta sin misión no ve nada ni toca el espacio general
+  if(u.rol==='admin'||esEditorAdmin(u))return null;
+  return u.misionId||'sin-mision';           // una cuenta sin misión no ve nada ni toca el espacio general
 }
-const propioAmbito=d=>(d.ministerioId||null)===ambitoActual();
-// visibleBiblioteca: un álbum sin ministerioId es de la biblioteca general (de todos),
-// salvo que esté oculto (solo lo ve el nivel Administrador). Un álbum con ministerioId
-// es privado de ese ministerio: solo lo ve ese ministerio (o el Administrador revisándolo).
-export const visibleBiblioteca=a=>{const mid=a.ministerioId||null;return mid===null?(esNivelAdmin()||!a.oculto):mid===ambitoActual()};
-// ¿se puede editar este álbum (o mover una canción hacia él)? Uno «general» (sin ministerioId)
-// solo lo edita el nivel Administrador; uno privado de un ministerio lo edita ese ministerio
+const propioAmbito=d=>(d.misionId||null)===ambitoActual();
+// visibleBiblioteca: un álbum sin misionId es de la biblioteca general (de todos),
+// salvo que esté oculto (solo lo ve el nivel Administrador). Un álbum con misionId
+// es privado de esa misión: solo lo ve esa misión (o el Administrador revisándolo).
+export const visibleBiblioteca=a=>{const mid=a.misionId||null;return mid===null?(esNivelAdmin()||!a.oculto):mid===ambitoActual()};
+// ¿se puede editar este álbum (o mover una canción hacia él)? Uno «general» (sin misionId)
+// solo lo edita el nivel Administrador; uno privado de una misión lo edita esa misión
 // (o quien lo esté revisando con el selector de espacio de trabajo).
-export const puedeEditarAlbum=alb=>!alb?false:(alb.ministerioId?(puedeEditar()&&alb.ministerioId===ambitoActual()):esNivelAdmin());
+export const puedeEditarAlbum=alb=>!alb?false:(alb.misionId?(puedeEditar()&&alb.misionId===ambitoActual()):esNivelAdmin());
 
-// Colecciones que pertenecen a un ministerio: se guardan con el ministerioId del ámbito
+// Colecciones que pertenecen a una misión: se guardan con el misionId del ámbito
 // actual (null = espacio general) y solo se ven dentro de ese mismo ámbito.
 const COL_AMBITO=new Set(['eventos','dias','escalas','personas','repertorios','albumes']);
 function conAmbito(col,d){
   if(!COL_AMBITO.has(col))return d;
   const amb=ambitoActual();
-  return amb?{...d,ministerioId:amb}:d;
+  return amb?{...d,misionId:amb}:d;
 }
 export const guardar=(col,id,d,m=true)=>setDoc(doc(db,col,id),conAmbito(col,d),{merge:m});
 // crear: además de guardar, marca cuándo se creó (creadoEn) si no venía ya puesto — lo usa
@@ -142,6 +160,7 @@ export function modal(html){
 // Esc cierra la ventana que esté encima (aunque el foco se haya perdido)
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
+  if(document.querySelector('.sb.abierto'))return;   // un selector con banderas abierto: Esc solo lo cierra a él (ver misiones.js)
   const abiertas=document.querySelectorAll('body > .mo');
   if(abiertas.length){e.stopPropagation();e.preventDefault();abiertas[abiertas.length-1].remove()}
 },true);

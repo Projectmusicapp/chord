@@ -1,6 +1,7 @@
 // ===== LOGIN (Firebase Authentication: correo + contraseña, con autorregistro) =====
 import {establecerSesion,alCambiarAuth,iniciarSesionAuth,cerrarSesionAuth,enviarVerificacion,recargarUsuarioAuth,escucharDoc} from "./base.js";
 import {montarMenuUsuario,cargado,sinCuentas,misionesDisponibles,crearPrimerAdmin,autorregistrar} from "./usuarios.js";
+import {selectorBandera,activarSelectores} from "./misiones.js";
 
 const svg=d=>`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const NOTA='<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>';
@@ -20,8 +21,13 @@ const ERRORES_AUTH={
 const marco=contenido=>`<form class="login" novalidate>${contenido}</form>`;
 
 // Carga todas las pantallas a la vez y, cuando están listas, dibuja la pantalla actual
+// vieneDeLogin: se pone en true cuando se muestra cualquier pantalla de entrada (login, crear cuenta,
+// primer administrador). Así, al entrar, la app va al Inicio; pero si solo recargas la página
+// con la sesión ya abierta, te quedas en la pantalla donde estabas.
+let vieneDeLogin = false;
 async function iniciarApp() {
   document.body.classList.remove('sin-sesion');
+  if (vieneDeLogin) { vieneDeLogin = false; history.replaceState(null, '', '#inicio'); }
   const [base] = await Promise.all(['base', 'canciones', 'calendario', 'escalas', 'repertorio', 'respaldo', 'ver'].map(m => import(`./${m}.js`)));
   if (base.appCargada) base.appCargada();   // (por si el navegador aún tiene guardada una versión anterior de base.js)
   dispatchEvent(new HashChangeEvent('hashchange'));
@@ -29,6 +35,7 @@ async function iniciarApp() {
 }
 
 function mostrarLogin() {
+  vieneDeLogin = true;
   document.body.classList.add('sin-sesion');
   document.title = 'Iniciar sesión · Músicapp';
   const app = document.getElementById('app');
@@ -60,6 +67,7 @@ function mostrarLogin() {
 }
 
 async function mostrarRegistro() {
+  vieneDeLogin = true;
   document.body.classList.add('sin-sesion');
   document.title = 'Crear cuenta · Músicapp';
   const app = document.getElementById('app');
@@ -73,10 +81,7 @@ async function mostrarRegistro() {
     <label>Nombre<input name="nombre" autocomplete="name" required></label>
     <label>Correo<input name="correo" type="email" autocomplete="email" required></label>
     <label>Misión
-      <select name="mision" required>
-        <option value="">Elige tu misión…</option>
-        ${misiones.map(m => `<option value="${m.id}">${m.nombre}${m.pais ? ' · ' + m.pais : ''}</option>`).join('')}
-      </select>
+      ${selectorBandera({ name: 'mision', placeholder: 'Elige tu misión…', opciones: misiones.map(m => ({ valor: m.id, texto: m.nombre + (m.pais ? ' · ' + m.pais : ''), codigo: m.codigo })) })}
     </label>
     <label>Contraseña (mínimo 6 caracteres)<input name="clave" type="password" autocomplete="new-password" required></label>
     <label>Repetir contraseña<input name="clave2" type="password" autocomplete="new-password" required></label>
@@ -84,7 +89,8 @@ async function mostrarRegistro() {
     <button type="submit">Crear cuenta</button>
     <p class="ayuda" style="margin-top:14px">¿Ya tienes cuenta? <button type="button" class="lnk" id="irLogin">Inicia sesión</button></p>`);
   const f = app.querySelector('form');
-  if (!misiones.length) { f.mision.insertAdjacentHTML('afterend', '<small style="color:var(--rojo)">Aún no hay ninguna misión creada. Pide a un Administrador que cree una primero.</small>') }
+  activarSelectores(app);
+  if (!misiones.length) { f.querySelector('.sb').insertAdjacentHTML('afterend', '<small style="color:var(--rojo)">Aún no hay ninguna misión creada. Pide a un Administrador que cree una primero.</small>') }
   f.nombre.focus();
   const err = t => { const p = f.querySelector('.error'); p.textContent = t; p.hidden = false };
   f.onsubmit = async e => {
@@ -104,6 +110,7 @@ async function mostrarRegistro() {
 }
 
 function mostrarPrimerAdmin() {
+  vieneDeLogin = true;
   document.body.classList.add('sin-sesion');
   document.title = 'Configurar · Músicapp';
   const app = document.getElementById('app');

@@ -161,7 +161,7 @@ function item(tipo,o,cont,arrastrable){
   const esAlbum=tipo==='album',alb=esAlbum?o:E.albumes.find(a=>a.id===o.albumId);
   const titulo=esAlbum?o.nombre:o.titulo,lista=PREF.vista==='lista';
   const editable=puedeEditarAlbum(alb),puedeArrastrar=arrastrable&&editable;
-  const ocultarBtn=esAlbum&&esNivelAdmin()&&!o.ministerioId;
+  const ocultarBtn=esAlbum&&esNivelAdmin()&&!o.misionId;
   const icono=alb&&alb.foto?'':(esAlbum?ic('dsc',lista?22:40):ic('mus',lista?20:30));
   const n=esAlbum?E.canciones.filter(c=>c.albumId===o.id).length:0;
   const detalle=esAlbum?`<small>${n} ${n===1?'canci\u00f3n':'canciones'}</small>`:(cont==='busqueda'&&alb?`<small>${esc(alb.nombre)}</small>`:'');

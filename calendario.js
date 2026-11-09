@@ -50,7 +50,7 @@ const NCOL={'#1F6FEB':'Azul','#2E7D32':'Verde','#7B1FA2':'Morado','#D9822B':'Nar
 const MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const DIA=['Domingo','Lunes','Martes','Mi\u00e9rcoles','Jueves','Viernes','S\u00e1bado'],DCORTO=['Dom','Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b'];
 const dos=n=>String(n).padStart(2,'0'),ymd=d=>d.getFullYear()+'-'+dos(d.getMonth()+1)+'-'+dos(d.getDate());
-// El id del documento «dias» tiene que ser distinto por ministerio (si no, dos ministerios que
+// El id del documento «dias» tiene que ser distinto por misión (si no, dos misiones que
 // resaltan la misma fecha se pisarían el mismo documento). En el espacio General se deja igual
 // que antes (solo la fecha) para no romper lo que ya existía.
 const idDia=f=>{const a=ambitoActual();return a?a+'_'+f:f};
