@@ -1,5 +1,5 @@
 // ===== LOGIN (Firebase Authentication: correo + contraseña, con autorregistro) =====
-import {establecerSesion,alCambiarAuth,iniciarSesionAuth,cerrarSesionAuth,enviarVerificacion,recargarUsuarioAuth,escucharDoc} from "./base.js";
+import {establecerSesion,alCambiarAuth,iniciarSesionAuth,cerrarSesionAuth,enviarVerificacion,recargarUsuarioAuth,escucharDoc,guardar} from "./base.js";
 import {montarMenuUsuario,cargado,sinCuentas,misionesDisponibles,crearPrimerAdmin,autorregistrar} from "./usuarios.js";
 import {selectorBandera,activarSelectores} from "./misiones.js";
 
@@ -205,7 +205,11 @@ function escucharAuth() {
       if (appIniciada) return;   // ya está dentro de la app; esto solo refresca la sesión (p.ej. le cambiaron el rol)
       appIniciada = true;
       const necesitaVerificar = datos.requiereVerificacion && !user.emailVerified;
-      if (necesitaVerificar) mostrarVerificar(user); else iniciarApp();
+      if (necesitaVerificar) { mostrarVerificar(user); return }
+      // Ya está verificado (por este camino o porque abrió el enlace y volvió a entrar):
+      // se guarda para que el resto de la app (p.ej. Configuración) ya no lo marque pendiente.
+      if (datos.requiereVerificacion) guardar('usuarios', user.uid, { requiereVerificacion: false });
+      iniciarApp();
     });
   });
 }

@@ -150,8 +150,11 @@ function rolesCreables(actor){
   if(esEditorMision(actor))return [['editor-mision','Editor de misión (de tu misión)'],['usuario','Usuario (solo ver)']];   // no crea cuentas Misión
   return [];
 }
+// cuentasVisibles: el Administrador y su Editor ven aquí solo las cuentas del espacio general
+// (Administrador/Editor del administrador) — las cuentas de cada misión se gestionan desde su
+// propia tarjeta en la pantalla «Misiones», no mezcladas en esta lista (ver misiones.js).
 function cuentasVisibles(actor){
-  if(nivelAdminU(actor))return U;
+  if(nivelAdminU(actor))return U.filter(nivelAdminU);
   const mision=miMision(actor);                  // una misión nunca ve cuentas de otras misiones ni de Administradores
   return mision?U.filter(u=>u.misionId===mision&&!nivelAdminU(u)):[];
 }
@@ -259,7 +262,7 @@ function pintar(){
   }
 }
 
-function fila(u,actor){
+export function fila(u,actor){
   const edita=puedeEditarCuenta(u,actor),elimina=puedeEliminarCuenta(u,actor);
   const tuya=u.id===actor.id;
   const pendiente=u.requiereVerificacion&&!u.emailVerified&&u.id!==actor.id;
@@ -267,6 +270,7 @@ function fila(u,actor){
   return `<div class="ufila${u.activo===false?' inactiva':''}">
     <div class="un"><b>${esc(u.nombre||u.correo)}${tuya?' (tú)':''}</b><small>${esc(u.correo||'')}${u.activo===false?' · Desactivada':''}</small></div>
     <span class="rolchip">${esc(sub)}</span>
+    ${pendiente?`<span class="pend">Sin verificar correo</span>`:''}
     ${edita?`<div class="mb2"><button class="sec" data-ed="${u.id}">${ic('edt',15)} Editar</button>${elimina?`<button class="ic rj" data-el="${u.id}" aria-label="Eliminar a ${esc(u.nombre||u.correo)}" title="Eliminar">${ic('trs',16)}</button>`:''}</div>`:''}
   </div>`;
 }
@@ -332,18 +336,20 @@ function formNuevo(){
   o.onkeydown=e=>{if(e.key==='Enter'&&e.target.tagName!=='SELECT'){e.preventDefault();aceptar()}};
 }
 
-function formEditar(u){
+export function formEditar(u){
   if(!u)return;
   const cambiaNivel=esAdministrador();                          // SOLO el Administrador cambia niveles
   const cambiaMision=esNivelAdmin();                            // el Administrador y su Editor pasan una cuenta a otra misión (una cuenta de misión no)
   const nivelAct=nivelDe(u);
   const sinMision=!u.misionId||!misionPorId(u.misionId);
+  const pendiente=u.requiereVerificacion&&!u.emailVerified;
   const o=modal(`<div class="mh"><h2>Editar cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" value="${esc(u.nombre||'')}" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Correo<input id="fe" value="${esc(u.correo||'')}" disabled></label>
     ${cambiaNivel?`<label class="fl2" style="margin-bottom:12px">Nivel<select id="fr">${Object.entries(NIVELES).map(([v,t])=>`<option value="${v}" ${v===nivelAct?'selected':''}>${esc(t)}</option>`).join('')}</select></label>`:''}
     ${cambiaMision?`<label class="fl2" id="fmw" style="margin-bottom:12px">Misión<select id="fm">${sinMision?'<option value="">(elige una misión)</option>':''}${listaMisiones().map(m=>`<option value="${m.id}" ${m.id===u.misionId?'selected':''}>${esc(etiquetaMision(m))}</option>`).join('')}</select></label>`:''}
     <p style="margin:0 0 12px;color:var(--gris);font-size:13.5px">La contraseña solo la cambia cada cuenta desde el botón «Mi cuenta» de su propia sesión. El correo no se puede cambiar aquí.</p>
+    ${pendiente?`<label class="chk" style="margin:2px 0 14px"><input type="checkbox" id="fv"> Dejarla entrar sin verificar su correo (si quedó bloqueada y no le llega el correo)</label>`:''}
     <label class="chk" style="margin:2px 0 14px"><input type="checkbox" id="fa" ${u.activo===false?'':'checked'}> Cuenta activa (puede iniciar sesión)</label>
     <p class="error" role="alert" hidden></p>
     <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Guardar</button></div>`);
@@ -367,6 +373,7 @@ function formEditar(u){
       if(!v)return err('Elige la misión de esta cuenta.');
       cambios.misionId=v;
     }
+    if(pendiente&&$('#fv',o).checked)cambios.requiereVerificacion=false;
     guardar('usuarios',u.id,cambios);
     o.remove();aviso('Cambios guardados.');
   };
