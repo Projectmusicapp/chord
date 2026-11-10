@@ -28,7 +28,7 @@ let vieneDeLogin = false;
 async function iniciarApp() {
   document.body.classList.remove('sin-sesion');
   if (vieneDeLogin) { vieneDeLogin = false; history.replaceState(null, '', '#inicio'); }
-  const [base] = await Promise.all(['base', 'canciones', 'calendario', 'escalas', 'repertorio', 'respaldo', 'ver'].map(m => import(`./${m}.js`)));
+  const [base] = await Promise.all(['base', 'canciones', 'calendario', 'escalas', 'repertorio', 'respaldo', 'ver', 'milista'].map(m => import(`./${m}.js`)));   // Chigo: se agregó 'milista' (pantalla «Mi lista»)
   if (base.appCargada) base.appCargada();   // (por si el navegador aún tiene guardada una versión anterior de base.js)
   dispatchEvent(new HashChangeEvent('hashchange'));
   montarMenuUsuario(salir);

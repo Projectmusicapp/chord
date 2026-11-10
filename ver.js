@@ -138,6 +138,9 @@ const medio=d=>{const n=d>6?d-12:d;if(!n)return '';const a=Math.abs(n),t=(a>=2?M
 
 // Las canciones del repertorio, en orden, cada una con una clave propia (así cada una se transpone por separado)
 function bloques(r){
+  // ===== CHIGO · una lista de «Mi lista» (ver milista.js) se dibuja como un solo bloque de canciones =====
+  if(r.tipo==='lista')return [{titulo:'Canciones',sin:false,items:(r.canciones||[]).map((cid,i)=>({clave:'l:'+i+':'+cid,cid}))}];
+  // ===== FIN CHIGO =====
   // textos escritos a mano: cada uno es su propio bloque, justo después del bloque donde se añadió ('ini' = al principio)
   const tb=k=>textosDespues(r,k).map(t=>({titulo:(t.titulo||'').trim(),t,tx:true}));
   if(r.tipo==='evento')return [...tb('ini'),...(r.secciones||[]).flatMap(s=>[{titulo:s.nombre||'Sección',id:s.id,escala:s.escala,sin:esPeticiones(s.nombre),items:(s.canciones||[]).map((cid,i)=>({clave:'s:'+s.id+':'+i+':'+cid,cid}))},...tb(s.id)])];

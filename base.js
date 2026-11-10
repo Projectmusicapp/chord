@@ -176,6 +176,13 @@ export const vistas={};
 // menuDe: las secciones de contenido. «Usuarios» (cuentas, nombre/logo, copia de seguridad)
 // no va aquí: se abre como «Configuración» desde el menú de la cuenta, en la cabecera.
 const menuDe=()=>[['calendario','cal','Calendario','Eventos y ensayos'],['repertorio','mus','Repertorio','Misas, eventos y PDF'],['canciones','dsc','Canciones','Letras y acordes'],['escalas','usr','Escalas','Equipos por día']];
+// ===== CHIGO · «Mi lista» para las cuentas «Usuario (solo ver)» =====
+// Esas cuentas solo ven «Mi lista» y «Canciones» en la barra (Inicio sigue en el logo),
+// y no pueden abrir Calendario, Repertorio ni Escalas aunque escriban la dirección.
+const menuUsuario=[['milista','mus','Mi lista','Tus listas de canciones'],['canciones','dsc','Canciones','Letras y acordes']];
+const esSoloVer=()=>!!usuarioActual&&usuarioActual.rol==='usuario';
+const BLOQUEADAS_SOLO_VER=['calendario','repertorio','escalas'];
+// ===== FIN CHIGO =====
 const vista=()=>location.hash.slice(1)||'inicio';
 let vistaAnterior=null,todoCargado=false;
 // login.js avisa cuando ya se cargaron todas las pantallas (antes de eso no se muestra «Esta página no existe»)
@@ -184,8 +191,10 @@ function irA(){
   const v=vista(),ver=v.startsWith('ver/');            // «ver/ID» = ventana Compartir de un repertorio
   if(!listo&&!ver)return;                               // espera el nombre y el logo guardados (así no aparece el nombre por defecto y luego cambia)
   if(!sesion()&&!ver)return;                            // sin sesión: login.js controla la pantalla, aquí no se toca el menú ni #app
+  if(esSoloVer()&&BLOQUEADAS_SOLO_VER.includes(v)){location.hash='inicio';return}   // Chigo: el usuario (solo ver) no entra a estas pantallas
   document.body.classList.toggle('modo-ver',ver);
-  const menu=menuDe();
+  const menu=esSoloVer()?menuUsuario:menuDe();   // Chigo: menú reducido para el usuario (solo ver)
+  document.body.classList.toggle('solo-ver',esSoloVer());   // Chigo: marca el <body> para centrar la barra en el celular (CSS en milista.js)
   $('#nav').innerHTML=ver?'':menu.map(([k,i,n])=>`<a href="#${k}" class="${k===v?'on':''}" ${k===v?'aria-current="page"':''}>${ic(i,18)}<span>${n}</span></a>`).join('');
   const el=$('#app');el.innerHTML='';el.className='';el.dataset.vista=v;
   el.onclick=el.oninput=el.onchange=el.onkeydown=null;   // quita lo que dejó la pantalla anterior

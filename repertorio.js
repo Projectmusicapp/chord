@@ -77,9 +77,14 @@ const alb=c=>A.find(a=>a.id===c.albumId)?.nombre||'';
 const titAlb=c=>`<span>${esc(c.titulo)}</span>`+(alb(c)?`<small>${esc(alb(c))}</small>`:'');
 const ref=()=>{if(el)rep?pder():lista()};
 alCambiarEquipos(()=>{if(el&&rep){pizq();pder()}});
-escuchar('canciones',l=>{C=l;ref()});escuchar('etiquetas',l=>{T=l;ref()});escuchar('albumes',l=>{A=l});escuchar('repertorios',l=>{R=l;ref()});
+escuchar('canciones',l=>{C=l;ref()});escuchar('etiquetas',l=>{T=l;ref()});escuchar('albumes',l=>{A=l});escuchar('repertorios',l=>{R=l.filter(r=>!r.miLista);ref()});   // Chigo: la lista de repertorios ya no incluye las de «Mi lista» (miLista:true)
 const rand=()=>Math.random().toString(36).slice(2,8);
 const sec=id=>rep.secciones.find(s=>s.id===id);
+// ===== CHIGO · Etiquetas separadas en «Misas» y «Otros» (ver etiquetas.js) =====
+// En las secciones de un evento solo se ofrecen las etiquetas del grupo «Otros» (grupo:'otro').
+// Si una sección ya tenía elegida una etiqueta de misa antes de este cambio, se conserva para no perderla.
+const etiquetasEvento=s=>T.filter(t=>t.grupo==='otro'||t.id===s.tag);
+// ===== FIN CHIGO =====
 const tagId=n=>T.find(t=>t.nombre.toLowerCase()===n.toLowerCase())?.id;
 const candMom=id=>{const g=tagId(MOM.find(m=>m[0]===id)[1]);return g?C.filter(c=>(c.etiquetas||[]).includes(g)):[]};
 const candSec=s=>s.tag?C.filter(c=>(c.etiquetas||[]).includes(s.tag)):C;
@@ -127,7 +132,7 @@ function pizq(){
     return`<div class="mrow"><div class="mn"><b>${n}</b>${c?titAlb(c):'<em class="falta">Sin canci\u00f3n</em>'}</div><button class="ic" data-pick="${id}" aria-label="Elegir canci\u00f3n para ${n}" title="Elegir">${ic('edt',15)}</button><button class="ic" data-rnd="${id}" aria-label="Canci\u00f3n al azar para ${n}" title="Al azar">${ico(SHF,15)}</button><button class="ic rj" data-rm="${id}" aria-label="Quitar canci\u00f3n de ${n}" title="Quitar"${c?'':' disabled'}>${ic('x',15)}</button></div>`};
   const secs=s=>`<div class="sec2"><div class="dh"><input class="inl" data-sn="${s.id}" value="${esc(s.nombre)}" placeholder="Nombre de la secci\u00f3n"><button class="ic" data-sesc="${s.id}" aria-label="Elegir escala de esta secci\u00f3n" title="Elegir escala">${ic('usr',15)}</button><button class="ic rj" data-sdel="${s.id}" aria-label="Eliminar secci\u00f3n">${ic('trs',15)}</button></div>
     ${textoEquipo(s.escala)?`<div class="escsec"><button class="escver" data-escver="${s.id}" aria-haspopup="dialog" title="Ver integrantes">${ic('usr',14)}<span>${esc(textoEquipo(s.escala))}</span></button><button data-sescq="${s.id}" aria-label="Quitar escala" title="Quitar escala">${ic('x',13)}</button></div>`:''}
-    <label class="fl2">Opciones de canciones<select data-st="${s.id}"><option value="">Todas las canciones</option>${[...T].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{sensitivity:'base'})).map(t=>`<option value="${t.id}"${s.tag===t.id?'selected':''}>${esc(t.nombre)}</option>`).join('')}</select></label>`
+    <label class="fl2">Opciones de canciones<select data-st="${s.id}"><option value="">Todas las canciones</option>${etiquetasEvento(s)/* Chigo */.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{sensitivity:'base'})).map(t=>`<option value="${t.id}"${s.tag===t.id?'selected':''}>${esc(t.nombre)}</option>`).join('')}</select></label>`   // Chigo: solo etiquetas del grupo «Otros» (ver etiquetasEvento arriba)
     +s.canciones.map(id=>{const c=C.find(x=>x.id===id);return c?`<div class="mrow"><div class="mn">${titAlb(c)}</div><button class="ic rj" data-srm="${s.id}:${id}" aria-label="Quitar">${ic('x',15)}</button></div>`:''}).join('')
     +`<button class="sec" data-spick="${s.id}">${ic('pls',15)} Canci\u00f3n</button></div>`;
   i.innerHTML=`<div class="ch2"><button class="sec" data-back>${ic('lft',16)} Repertorios</button><span class="tipochip">${rep.tipo==='evento'?'Evento':'Misa'}</span></div>
