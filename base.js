@@ -1,11 +1,15 @@
 // ===== BASE: Firebase + funciones comunes + navegación + INICIO =====
 import {initializeApp,deleteApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,collection,doc,setDoc,addDoc,deleteDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,setDoc,addDoc,deleteDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,sendEmailVerification,updatePassword,reload} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {firebaseConfig} from "./firebase-config.js";
 
 const app=initializeApp(firebaseConfig);
-const db=getFirestore(app);
+// Caché local (IndexedDB): al recargar la página (o abrir otra pestaña), lo que ya se había
+// leído sale de la caché del navegador en vez de volver a leerse de Firestore — solo se leen
+// los cambios reales desde la última vez. Esto es lo que más baja la demanda a la base de datos,
+// porque hoy cada recarga vuelve a leer todas las colecciones enteras.
+const db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
 export const auth=getAuth(app);
 export const $=(s,r=document)=>r.querySelector(s);
 export const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -55,7 +59,7 @@ export async function crearCuentaComoAdmin(correo,clave){
 //  - Si un editor no trae editorDe, se trata como Editor de misión (lo más restringido).
 let usuarioActual=null;
 export const sesion=()=>usuarioActual;
-export function establecerSesion(u){usuarioActual=u}
+export function establecerSesion(u){usuarioActual=u;dispatchEvent(new Event('ambitocambio'))}
 export const esEditorAdmin=u=>!!u&&u.rol==='editor'&&u.editorDe==='admin';
 export const esEditorMision=u=>!!u&&u.rol==='editor'&&u.editorDe!=='admin';
 // esNivelAdmin: poder de Administrador (el Administrador y su Editor).

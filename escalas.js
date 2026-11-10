@@ -1,5 +1,6 @@
 // ===== PANTALLA: ESCALAS (personas, equipos por día, modo edición) =====
-import {$,esc,guardar,crear,escuchar,eliminar,vistas,ic,modal,puedeEditar} from "./base.js";
+import {$,esc,guardar,crear,eliminar,vistas,ic,modal,puedeEditar,ambitoActual} from "./base.js";
+import {diasDeEscalas,listaPersonas,alCambiarEquipos} from "./equipos.js";
 
 const st=document.createElement('style');
 st.textContent=`[data-vista=escalas] .c2{margin-bottom:22px}
@@ -74,16 +75,20 @@ const ordenarMiembros=(miembrosIds)=>{
   });
 };
 
-escuchar('personas',l=>{
-  P=ordenarPersonas(l);
+// Los datos (ya filtrados por misi\u00f3n) viven en equipos.js, para no leerlos dos veces:
+// ver el comentario al principio de ese archivo.
+alCambiarEquipos(()=>{
+  P=ordenarPersonas(listaPersonas());
+  X=diasDeEscalas();
+  // El id de S\u00e1bado/Domingo incluye la misi\u00f3n (como idDia en calendario.js): antes eran los
+  // mismos dos ids fijos para todas las misiones, as\u00ed que la primera vez que CUALQUIER misi\u00f3n
+  // entraba aqu\u00ed sin d\u00edas propios, le robaba (sobrescrib\u00eda) el S\u00e1bado/Domingo de la que los
+  // tuviera creados antes. Los documentos viejos con el id fijo siguen funcionando igual para
+  // quien ya los ten\u00eda (se identifican por su campo misionId, no por su id), esto solo evita
+  // que una misi\u00f3n nueva choque con ellos.
+  if(!X.length&&puedeEditar()){const amb=ambitoActual();[['sabado','S\u00e1bado'],['domingo','Domingo']].forEach(([n,nom],o)=>guardar('escalas',amb?amb+'_'+n:n,{nombre:nom,orden:o,equipos:equipos()}))}
   pintar();
   pMan();
-});
-
-escuchar('escalas',l=>{
-  X=l.sort((a,b)=>(a.orden||0)-(b.orden||0));
-  if(!l.length&&puedeEditar())[['sabado','S\u00e1bado'],['domingo','Domingo']].forEach(([id,n],o)=>guardar('escalas',id,{nombre:n,orden:o,equipos:equipos()}));
-  pintar();
 });
 
 vistas.escalas=e=>{el=e;edit=false;abre=null;el.onclick=clic;el.onchange=cambia;

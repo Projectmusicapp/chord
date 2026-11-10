@@ -15,12 +15,20 @@
 //   htmlMiembros(sel) .... lista de integrantes para mostrar en un cuadro
 //   elegirEscala(sel, cb)  ventana con los días desplegables para elegir un equipo
 //   alCambiarEquipos(fn) . avisa cuando cambian días, equipos o personas
+//   diasDeEscalas() ...... los días con sus equipos (ya filtrados por misión)
+//   listaPersonas() ...... las personas (ya filtradas por misión)
+//
+//  La pantalla «Escalas» (escalas.js) lee también de aquí en vez de escuchar
+//  «escalas»/«personas» por su cuenta: así solo hay UN listener por colección
+//  (antes había dos, y el de escalas.js ni siquiera filtraba por misión).
 // =====================================================================
 import {$,esc,escucharPropio,ic,modal} from "./base.js";
 
 let X=[],P=[];
 const oyentes=[];
 export const alCambiarEquipos=fn=>{oyentes.push(fn)};
+export const diasDeEscalas=()=>X;
+export const listaPersonas=()=>P;
 const avisar=()=>oyentes.forEach(f=>f());
 escucharPropio('escalas',l=>{X=[...l].sort((a,b)=>(a.orden||0)-(b.orden||0));avisar()});
 escucharPropio('personas',l=>{P=l;avisar()});
