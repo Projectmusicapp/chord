@@ -38,10 +38,11 @@
 //  Una cuenta creada desde «Nueva cuenta» queda con requiereVerificacion:false:
 //  se confía en quien la dio de alta. Solo el autorregistro exige verificar.
 // =====================================================================
-import {$,esc,guardar,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,esAdministrador,esEditorAdmin,esEditorMision,puedeEditar,configActual,hoyLargo,auth,cambiarMiClave,crearCuentaAuth,crearCuentaComoAdmin,enviarVerificacion} from "./base.js";
+import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,esAdministrador,esEditorAdmin,esEditorMision,puedeEditar,configActual,hoyLargo,auth,cambiarMiClave,crearCuentaAuth,crearCuentaComoAdmin,enviarVerificacion} from "./base.js";
 import {ventana as abrirRespaldo} from "./respaldo.js";
 import {E,alCambiar} from "./estado.js";
-import {misionesCargadas,alCambiarMisiones,listaMisiones,misionPorId,etiquetaMision} from "./misiones.js";
+import {misionesCargadas,alCambiarMisiones,listaMisiones,misionPorId,etiquetaMision,PAISES,alfa,selectorBandera,activarSelectores,banderaHtml} from "./misiones.js";
+const NOMBRE_PAIS=Object.fromEntries(PAISES);
 
 // NIVELES: los 5 «niveles» que se pueden elegir (el Editor tiene dos variantes).
 const NIVELES={admin:'Administrador','editor-admin':'Editor del administrador','editor-mision':'Editor de misión',mision:'Misión',usuario:'Usuario (solo ver)'};
@@ -86,8 +87,9 @@ header .dd-usuario button:hover{background:var(--capa);filter:none}
 .espacio .eh h3{color:var(--tx);margin:0;font-size:15px}
 .espacio p{margin:0;color:var(--gris);font-size:13.5px;font-weight:600;line-height:1.5}
 @media(max-width:760px){.bienvenida{padding:22px}}
-[data-vista=usuarios] .config{background:var(--capa);border-radius:var(--r-m);padding:14px;margin-bottom:18px;display:flex;flex-direction:column;gap:10px}
-[data-vista=usuarios] .config .mb2{margin:0}
+[data-vista=usuarios] .seccfg{margin-bottom:30px}
+[data-vista=usuarios] .seccfg>.ch2{margin-bottom:4px}
+[data-vista=usuarios] .seccfg>.ch2 h2{display:flex;align-items:center;gap:8px;font-size:19px}
 [data-vista=usuarios] .ulist{display:grid;gap:8px;margin-top:14px}
 [data-vista=usuarios] .ufila{display:flex;align-items:center;gap:12px;background:var(--capa);border-radius:var(--r-m);padding:10px 12px;flex-wrap:wrap}
 [data-vista=usuarios] .ufila .un{flex:1;min-width:160px}
@@ -95,7 +97,17 @@ header .dd-usuario button:hover{background:var(--capa);filter:none}
 [data-vista=usuarios] .ufila small{display:block;color:var(--gris);font-weight:500}
 [data-vista=usuarios] .rolchip{display:inline-block;background:var(--suave);color:var(--azul);border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:700}
 [data-vista=usuarios] .ufila.inactiva{opacity:.55}
-[data-vista=usuarios] .mb2{display:flex;gap:6px;flex-wrap:wrap}`;
+[data-vista=usuarios] .mb2{display:flex;gap:6px;flex-wrap:wrap}
+[data-vista=usuarios] .pend{display:inline-block;background:var(--oro-claro);color:var(--oro-texto);border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+[data-vista=usuarios] .mlist{display:grid;gap:8px;margin-top:14px}
+[data-vista=usuarios] .mfila{display:flex;flex-direction:column;gap:10px;background:var(--capa);border-radius:var(--r-m);padding:10px 12px}
+[data-vista=usuarios] .mfila-cab{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+[data-vista=usuarios] .mfila-cab .un{flex:1;min-width:160px}
+[data-vista=usuarios] .mfila-cab b{display:block}
+[data-vista=usuarios] .mfila-cab small{display:block;color:var(--gris);font-weight:500}
+[data-vista=usuarios] .mfila-cab .mb2{display:flex;gap:6px;flex-wrap:wrap}
+[data-vista=usuarios] .mroster{display:grid;gap:6px;border-top:1px solid var(--linea);padding-top:10px;margin-top:2px}
+[data-vista=usuarios] .mroster .ufila{background:var(--blanco)}`;
 document.head.append(st);
 
 let U=[],listo=false,el=null;
@@ -188,7 +200,6 @@ export function montarMenuUsuario(salir){
       <div class="nombre">${esc(actor.nombre||actor.correo)}</div>
       <button data-mc>${ic('usr',15)} Mi cuenta</button>
       ${puedeEditar()?`<button data-cfg>${ic('cfg',15)} Configuración</button>`:''}
-      ${esNivelAdmin()?`<button data-mis>${ic('pin',15)} Misiones</button>`:''}
       <button data-sal>${ic('out',15)} Salir</button>
     </div>`;
   const boton=cont.querySelector('.btn-usuario'),dd=cont.querySelector('.dd-usuario');
@@ -197,7 +208,6 @@ export function montarMenuUsuario(salir){
   document.addEventListener('click',e=>{if(!dd.hidden&&!cont.contains(e.target))cerrar()});
   cont.querySelector('[data-mc]').onclick=()=>{cerrar();location.hash='cuenta'};
   const cfgBtn=cont.querySelector('[data-cfg]');if(cfgBtn)cfgBtn.onclick=()=>{cerrar();location.hash='usuarios'};
-  const misBtn=cont.querySelector('[data-mis]');if(misBtn)misBtn.onclick=()=>{cerrar();location.hash='misiones'};
   cont.querySelector('[data-sal]').onclick=()=>{cerrar();salir()};
   header.append(cont);
 }
@@ -244,22 +254,133 @@ addEventListener('hashchange',()=>{if(location.hash!=='#usuarios')el=null});
 function pintar(){
   if(!el)return;
   const actor=sesion();if(!actor)return;
-  const lista=cuentasVisibles(actor).slice().sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
-  const admin=esNivelAdmin(),cfg=configActual();
-  const config=admin?`<div class="config"><h2 style="margin:0">Administración</h2>
-      <div class="mb2"><button id="bl">${ic('img',16)} Cambiar logo</button>${cfg.logo?`<button class="sec" id="bq">${ic('x',16)} Quitar logo</button>`:''}<button id="bn">${ic('edt',16)} Cambiar nombre</button><button class="sec" id="br">${ic('cfg',16)} Copia de seguridad</button><input type="file" id="fl" accept="image/*" hidden></div>
-    </div>`:'';
-  el.innerHTML=`<div class="ch2"><h1>Usuarios</h1><button data-nu>${ic('pls',16)} Nueva cuenta</button></div>
-    ${config}
-    <div class="ulist">${lista.map(u=>fila(u,actor)).join('')||'<p class="vacio">Aún no hay cuentas aquí.</p>'}</div>`;
+  el.innerHTML=esNivelAdmin()?pintarAdmin(actor):pintarEquipo(actor);
   el.onclick=clic;
-  if(admin){
-    const bl=$('#bl',el);if(bl)bl.onclick=()=>$('#fl',el).click();
-    const fl=$('#fl',el);if(fl)fl.onchange=async e=>guardar('config','app',{logo:await imagen(e.target.files[0],200)});
-    const bq=$('#bq',el);if(bq)bq.onclick=()=>{if(confirm('¿Quitar el logo y volver al icono por defecto?'))guardar('config','app',{logo:''})};
-    const bn=$('#bn',el);if(bn)bn.onclick=()=>{const n=prompt('Nombre de la app',cfg.nombre);if(n)guardar('config','app',{nombre:n})};
-    const br=$('#br',el);if(br)br.onclick=abrirRespaldo;
-  }
+  if(esNivelAdmin())cablearAdministracion();
+}
+
+// Vista de una cuenta Misión/Editor de misión: solo su propio equipo.
+function pintarEquipo(actor){
+  const lista=cuentasVisibles(actor).slice().sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
+  return `<div class="ch2"><h1>Configuración</h1><button data-nu>${ic('pls',16)} Nueva cuenta</button></div>
+    <div class="ulist">${lista.map(u=>fila(u,actor)).join('')||'<p class="vacio">Aún no hay cuentas aquí.</p>'}</div>`;
+}
+
+// Vista del Administrador (y su Editor): Usuarios (espacio general) / Misiones (con su propio
+// equipo anidado en cada tarjeta) / Administración (nombre, logo, copia de seguridad).
+function pintarAdmin(actor){
+  const admins=cuentasVisibles(actor).sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
+  const misiones=listaMisiones();
+  const h=huerfanos();
+  const cfg=configActual();
+  return `<div class="ch2"><h1>Configuración</h1></div>
+
+    <section class="seccfg">
+      <div class="ch2"><h2>${ic('usr',19)} Usuarios</h2><button data-nu>${ic('pls',16)} Nueva cuenta</button></div>
+      <p class="vacio">Administradores y Editores del administrador, con acceso a toda la app.</p>
+      <div class="ulist">${admins.map(u=>fila(u,actor)).join('')||'<p class="vacio">Aún no hay cuentas aquí.</p>'}</div>
+    </section>
+
+    <section class="seccfg">
+      <div class="ch2"><h2>${ic('pin',19)} Misiones</h2><button data-nm>${ic('pls',16)} Añadir misión</button></div>
+      <p class="vacio">Cada misión es un espacio independiente: su propio calendario, escalas y canciones privadas.</p>
+      <div class="mlist">${misiones.map(misionFila).join('')||'<p class="vacio">Aún no hay misiones. Pulsa «Añadir misión» para crear la primera.</p>'}</div>
+      ${h.length?`<p class="vacio" style="margin-top:16px">Sin misión asignada (su misión ya no existe):</p><div class="ulist">${h.map(u=>fila(u,actor)).join('')}</div>`:''}
+    </section>
+
+    <section class="seccfg">
+      <div class="ch2"><h2>${ic('cfg',19)} Administración</h2></div>
+      <p class="vacio">Afecta a toda la app, para todas las misiones por igual.</p>
+      <div class="ulist">
+        <div class="ufila">
+          <div class="un"><b>Logo de la app</b><small>Se muestra en la cabecera y en el icono de la pestaña.</small></div>
+          <div class="mb2"><button id="bl">${ic('img',16)} Cambiar logo</button>${cfg.logo?`<button class="sec" id="bq">${ic('x',16)} Quitar logo</button>`:''}<input type="file" id="fl" accept="image/*" hidden></div>
+        </div>
+        <div class="ufila">
+          <div class="un"><b>Nombre de la app</b><small>El nombre que aparece junto al logo, arriba de todo.</small></div>
+          <div class="mb2"><button id="bn">${ic('edt',16)} Cambiar nombre</button></div>
+        </div>
+        <div class="ufila">
+          <div class="un"><b>Copia de seguridad</b><small>Descarga todos los datos de la app en un archivo.</small></div>
+          <div class="mb2"><button class="sec" id="br">${ic('cfg',16)} Copia de seguridad</button></div>
+        </div>
+      </div>
+    </section>`;
+}
+
+function cablearAdministracion(){
+  const bl=$('#bl',el);if(bl)bl.onclick=()=>$('#fl',el).click();
+  const fl=$('#fl',el);if(fl)fl.onchange=async e=>guardar('config','app',{logo:await imagen(e.target.files[0],200)});
+  const bq=$('#bq',el);if(bq)bq.onclick=()=>{if(confirm('¿Quitar el logo y volver al icono por defecto?'))guardar('config','app',{logo:''})};
+  const bn=$('#bn',el);if(bn)bn.onclick=()=>{const n=prompt('Nombre de la app',configActual().nombre);if(n)guardar('config','app',{nombre:n})};
+  const br=$('#br',el);if(br)br.onclick=abrirRespaldo;
+}
+
+// ---------- Misiones (anidadas aquí: ver banner de arriba de este archivo) ----------
+// equipoTodos: todas las cuentas de esta misión (cualquier nivel), para anidarlas en su tarjeta
+// en vez de mezclarlas con las demás en la sección «Usuarios» (ver cuentasVisibles).
+const equipoTodos=id=>U.filter(u=>u.misionId===id).sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
+// equipoEditor: solo las cuentas con poder de edición de esta misión (Misión y Editor de misión),
+// para el botón de activar/desactivar en bloque (no incluye a los Usuarios que solo ven).
+const equipoEditor=id=>U.filter(u=>u.misionId===id&&(u.rol==='mision'||(u.rol==='editor'&&u.editorDe==='mision')));
+// huerfanos: cuentas cuya misión ya no existe (se borró la misión a la que pertenecían). Sin
+// esto quedarían invisibles (y por lo tanto imposibles de gestionar) en esta pantalla.
+const huerfanos=()=>U.filter(u=>u.misionId&&!misionPorId(u.misionId));
+
+// misionFila: una misión = bandera, nombre (y debajo el país y cuántas cuentas tiene), sus
+// botones y, debajo, su propio equipo anidado (con sus Editar/Eliminar) — así no hace falta ir
+// a buscarlo a la sección «Usuarios», que para el Administrador ya solo muestra el espacio general.
+function misionFila(m){
+  const equipo=equipoTodos(m.id),n=equipo.length,sub=[m.pais,n?`${n} ${n===1?'cuenta':'cuentas'}`:''].filter(Boolean).join(' · ');
+  const eqEditor=equipoEditor(m.id),inactivo=eqEditor.length>0&&eqEditor.every(u=>u.activo===false);
+  const actor=sesion();
+  return `<div class="mfila">
+    <div class="mfila-cab">${banderaHtml(m.codigo,m.pais)}<div class="un"><b>${esc(m.nombre)}</b><small>${esc(sub)}</small></div>
+      <div class="mb2">
+        ${eqEditor.length?`<button class="sec" data-tog="${m.id}">${inactivo?'Reactivar equipo':'Desactivar equipo'}</button>`:''}
+        <button class="sec" data-med="${m.id}">${ic('edt',15)} Editar</button>
+        <button class="ic rj" data-mel="${m.id}" aria-label="Eliminar la misión ${esc(m.nombre)}" title="Eliminar">${ic('trs',16)}</button>
+      </div>
+    </div>
+    ${equipo.length?`<div class="mroster">${equipo.map(u=>fila(u,actor)).join('')}</div>`:''}
+  </div>`;
+}
+
+// alternarEquipo: activa o desactiva de un solo golpe a las cuentas Misión y Editor de misión
+// de esta misión (no toca a los Usuarios que solo ven).
+function alternarEquipo(id){
+  const eq=equipoEditor(id);if(!eq.length)return;
+  const m=misionPorId(id);if(!m)return;
+  const activar=eq.every(u=>u.activo===false);
+  const pregunta=`¿${activar?'Reactivar':'Desactivar'} el equipo de "${m.nombre}"? Esto ${activar?'permite':'bloquea'} el inicio de sesión de las cuentas Misión y Editor de misión (no afecta a los Usuarios que solo ven).`;
+  if(!confirm(pregunta))return;
+  eq.forEach(u=>guardar('usuarios',u.id,{activo:activar}));
+  aviso(activar?'Equipo reactivado.':'Equipo desactivado.');
+}
+
+// formularioMision: ventanita para añadir o editar una misión (m=null para una nueva).
+function formularioMision(m){
+  const nueva=!m;
+  if(!nueva&&!m.id)return;
+  const o=modal(`<div class="mh"><h2>${nueva?'Añadir misión':'Editar misión'}</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
+    <label class="fl2" style="margin-bottom:12px">País${selectorBandera({id:'fp',name:'pais',placeholder:'Elige un país…',valor:m?m.codigo:'',opciones:PAISES.map(([c,n])=>({valor:c,texto:n,codigo:c}))})}</label>
+    <label class="fl2" style="margin-bottom:12px">Nombre de la misión<input id="fn" value="${esc(m?m.nombre:'')}" autocomplete="off"></label>
+    <p class="error" role="alert" hidden></p>
+    <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Guardar</button></div>`);
+  const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
+  activarSelectores(o);
+  const aceptar=()=>{
+    const codigo=$('#fp',o).value,nombre=$('#fn',o).value.trim();
+    if(!codigo)return err('Elige un país.');
+    if(!nombre)return err('Escribe el nombre de la misión.');
+    if(listaMisiones().some(x=>x.id!==(m&&m.id)&&x.codigo===codigo&&alfa(x.nombre,nombre)===0))return err('Ya existe una misión con ese nombre en ese país.');
+    const datos={codigo,pais:NOMBRE_PAIS[codigo],nombre};
+    if(nueva)crear('misiones',datos);else guardar('misiones',m.id,datos);
+    o.remove();aviso(nueva?'Misión añadida.':'Cambios guardados.');
+  };
+  o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.id==='ok')aceptar()};
+  o.onkeydown=e=>{if(e.key==='Enter'&&e.target.tagName!=='SELECT'&&!e.target.closest('.sb')){e.preventDefault();aceptar()}};
+  const primero=nueva?$('.sb-btn',o):$('#fn',o);if(primero)primero.focus();
 }
 
 export function fila(u,actor){
@@ -285,6 +406,16 @@ function clic(e){
     if(confirm('¿Eliminar la cuenta "'+(u.nombre||u.correo)+'"? Dejará de verse en la app, pero su acceso de inicio de sesión no queda totalmente revocado (eso requiere la consola de Firebase). Para solo quitarle el acceso, mejor desactívala desde «Editar».')){
       eliminar('usuarios',u,'la cuenta "'+(u.nombre||u.correo)+'"',true);
     }
+  }
+  else if(!esNivelAdmin())return;                 // lo que sigue es solo de Misiones (Administrador y su Editor)
+  else if(d.nm!=null)formularioMision(null);
+  else if(d.med)formularioMision(misionPorId(d.med));
+  else if(d.tog)alternarEquipo(d.tog);
+  else if(d.mel){
+    const m=misionPorId(d.mel);if(!m)return;
+    const n=equipoTodos(m.id).length;
+    if(n)return alert(`Esta misión tiene ${n} ${n===1?'cuenta':'cuentas'}. Primero pasa esas cuentas a otra misión, o elimínalas (desde esta misma pantalla).`);
+    eliminar('misiones',m,'la misión "'+m.nombre+'"');
   }
 }
 

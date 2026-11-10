@@ -1,30 +1,32 @@
 // =====================================================================
-//  MISIONES.JS  ·  La pantalla «Misiones» (Administrador y su Editor)
+//  MISIONES.JS  ·  Datos de las misiones y el selector con banderas
 //
-//  Una misión es un equipo con su propio
-//  espacio (canciones propias, calendario, escalas y repertorio). Cada
-//  cuenta «mision», «editor de misión» o «usuario» pertenece a UNA misión: su campo
-//  «misionId» guarda el id de la misión (ver ambitoActual en base.js).
+//  Una misión es un equipo con su propio espacio (canciones propias,
+//  calendario, escalas y repertorio). Cada cuenta «mision», «editor de
+//  misión» o «usuario» pertenece a UNA misión: su campo «misionId» guarda
+//  el id de la misión (ver ambitoActual en base.js).
 //
 //  Cada misión guarda:  pais (nombre del país), codigo (2 letras, para la
 //  bandera) y nombre (el nombre de la misión).
 //
+//  La pantalla donde se ven y gestionan (altas, bajas, su equipo anidado)
+//  es «Configuración», dentro de usuarios.js — este archivo solo guarda
+//  los datos y el selector desplegable con banderas que usan tanto esa
+//  pantalla como el autorregistro (login.js).
+//
 //  MAPA DE ESTE ARCHIVO (usa Ctrl+F para encontrar cada parte):
 //   1. PAÍSES ............... la lista de países (con su código de bandera)
 //   2. DATOS ................ leer misiones y lo que usan otras pantallas
-//   3. ESTILOS .............. colores y tamaños de esta pantalla
-//   4. PANTALLA ............. la lista de misiones y sus botones
-//   5. FORMULARIO ........... la ventanita para añadir o editar una misión
+//   3. ESTILOS .............. el selector desplegable con banderas
 // =====================================================================
-import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,esNivelAdmin,sesion} from "./base.js";
+import {esc,escuchar} from "./base.js";
 import {BANDERAS} from "./banderas.js";
-import {fila as filaCuenta,formEditar as editarCuenta} from "./usuarios.js";
 
 // ---------------------------------------------------------------------
 // 1. PAÍSES  [código, nombre]  (toda América y Puerto Rico, en español).
 //    Para añadir uno: agrega su código y nombre aquí y su bandera en banderas.js.
 // ---------------------------------------------------------------------
-const alfa=(a,b)=>String(a||'').localeCompare(String(b||''),'es',{sensitivity:'base'});
+export const alfa=(a,b)=>String(a||'').localeCompare(String(b||''),'es',{sensitivity:'base'});
 export const PAISES=[
   ['AG','Antigua y Barbuda'],['AR','Argentina'],['BS','Bahamas'],['BB','Barbados'],['BZ','Belice'],['BO','Bolivia'],
   ['BR','Brasil'],['CA','Canadá'],['CL','Chile'],['CO','Colombia'],['CR','Costa Rica'],['CU','Cuba'],
@@ -34,12 +36,11 @@ export const PAISES=[
   ['KN','San Cristóbal y Nieves'],['VC','San Vicente y las Granadinas'],['LC','Santa Lucía'],['SR','Surinam'],
   ['TT','Trinidad y Tobago'],['UY','Uruguay'],['VE','Venezuela']
 ].sort((a,b)=>alfa(a[1],b[1]));
-const NOMBRE_PAIS=Object.fromEntries(PAISES);
 
 // ---------------------------------------------------------------------
 // 2. DATOS  (lo que también usan usuarios.js y login.js)
 // ---------------------------------------------------------------------
-let M=[],C=[],listo=false,el=null;     // M = misiones, C = cuentas (solo para contar cuántas tiene cada misión)
+let M=[],listo=false;
 const esperando=[],oyentes=[];
 const marcarListo=()=>{if(!listo){listo=true;esperando.forEach(r=>r());esperando.length=0}};
 export const misionesCargadas=()=>listo?Promise.resolve():new Promise(r=>esperando.push(r));
@@ -51,6 +52,9 @@ export const etiquetaMision=m=>m.pais?`${m.nombre} · ${m.pais}`:(m.nombre||'');
 export const banderaHtml=(codigo,pais)=>BANDERAS[codigo]
   ?`<img class="bandera" src="${BANDERAS[codigo]}" alt="Bandera de ${esc(pais||'')}" width="34" height="25">`
   :'<span class="bandera vacia" aria-hidden="true"></span>';
+
+escuchar('misiones',l=>{M=l;marcarListo();oyentes.forEach(f=>f())},
+  err=>{console.error('No se pudieron leer las misiones:',err);marcarListo()});   // si falla la lectura, la app no se queda esperando
 
 // ---- Selector desplegable con bandera ----
 // selectorBandera(...) devuelve el HTML; luego se llama activarSelectores(contenedor) una vez
@@ -112,28 +116,11 @@ export function activarSelectores(raiz){
   });
 }
 
-escuchar('misiones',l=>{M=l;marcarListo();if(el)pintar();oyentes.forEach(f=>f())},
-  err=>{console.error('No se pudieron leer las misiones:',err);marcarListo()});   // si falla la lectura, la app no se queda esperando
-escuchar('usuarios',l=>{C=l;if(el)pintar()});
-const cuentasDe=m=>C.filter(u=>u.misionId===m.id).length;
-// equipoTodos: todas las cuentas de esta misión (cualquier nivel), para anidarlas en su tarjeta
-// en vez de mezclarlas con las demás en la pantalla «Usuarios» (ver cuentasVisibles en usuarios.js).
-const equipoTodos=id=>C.filter(u=>u.misionId===id).sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
-// equipoEditor: solo las cuentas con poder de edición de esta misión (Misión y Editor de misión),
-// para el botón de activar/desactivar en bloque (no incluye a los Usuarios que solo ven).
-const equipoEditor=id=>C.filter(u=>u.misionId===id&&(u.rol==='mision'||(u.rol==='editor'&&u.editorDe==='mision')));
-// huerfanos: cuentas cuya misión ya no existe (se borró la misión a la que pertenecían). Sin
-// esto quedarían invisibles (y por lo tanto imposibles de gestionar) en esta pantalla.
-const huerfanos=()=>C.filter(u=>u.misionId&&!misionPorId(u.misionId));
-
 // ---------------------------------------------------------------------
-// 3. ESTILOS
+// 3. ESTILOS  (el selector desplegable con banderas; lo demás vive en usuarios.js)
 // ---------------------------------------------------------------------
 const hoja=document.createElement('style');
-hoja.textContent=`[data-vista=misiones] .mlist{display:grid;gap:8px;margin-top:14px}
-.mfila{display:flex;flex-direction:column;gap:10px;background:var(--capa);border-radius:var(--r-m);padding:10px 12px}
-.bandera{width:34px;height:25px;flex:none;display:block;object-fit:contain}.bandera.vacia{background:var(--suave);border-radius:4px}
-/* Selector con banderas (reemplaza al <select>, que no puede mostrar imágenes) */
+hoja.textContent=`.bandera{width:34px;height:25px;flex:none;display:block;object-fit:contain}.bandera.vacia{background:var(--suave);border-radius:4px}
 .sb{position:relative;display:block;width:100%}
 .sb .sb-btn{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 12px;background:var(--blanco);color:var(--tx);border:1px solid var(--linea);border-radius:var(--r-m);font-weight:600;text-align:left;justify-content:flex-start}
 .sb .sb-btn:hover{filter:none;background:var(--capa)}
@@ -146,114 +133,5 @@ hoja.textContent=`[data-vista=misiones] .mlist{display:grid;gap:8px;margin-top:1
 .sb .sb-op{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding:6px 12px;background:transparent;color:var(--tx);border:0;border-radius:0;font-weight:600;text-align:left;justify-content:flex-start}
 .sb .sb-op:hover,.sb .sb-op:focus-visible{filter:none;background:var(--capa)}
 .sb .sb-op[aria-selected=true]{background:var(--suave);color:var(--azul)}
-.sb .bandera{width:28px;height:21px}
-.mfila-cab{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.mfila-cab .un{flex:1;min-width:160px}.mfila-cab b{display:block}.mfila-cab small{display:block;color:var(--gris);font-weight:500}
-.mfila-cab .mb2{display:flex;gap:6px;flex-wrap:wrap}
-.mroster{display:grid;gap:6px;border-top:1px solid var(--linea);padding-top:10px;margin-top:2px}
-[data-vista=misiones] .ulist{display:grid;gap:8px}
-[data-vista=misiones] .ufila{display:flex;align-items:center;gap:12px;background:var(--blanco);border-radius:var(--r-m);padding:10px 12px;flex-wrap:wrap}
-[data-vista=misiones] .ufila .un{flex:1;min-width:160px}
-[data-vista=misiones] .ufila b{display:block}
-[data-vista=misiones] .ufila small{display:block;color:var(--gris);font-weight:500}
-[data-vista=misiones] .rolchip{display:inline-block;background:var(--suave);color:var(--azul);border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:700}
-[data-vista=misiones] .ufila.inactiva{opacity:.55}
-[data-vista=misiones] .mb2{display:flex;gap:6px;flex-wrap:wrap}
-[data-vista=misiones] .pend{display:inline-block;background:var(--oro-claro);color:var(--oro-texto);border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}`;
+.sb .bandera{width:28px;height:21px}`;
 document.head.append(hoja);
-
-// ---------------------------------------------------------------------
-// 4. PANTALLA
-// ---------------------------------------------------------------------
-vistas.misiones=contenedor=>{
-  if(!esNivelAdmin()){contenedor.innerHTML='<p class="vacio">No tienes acceso a esta pantalla.</p>';return}
-  el=contenedor;el.onclick=clic;pintar();
-};
-addEventListener('hashchange',()=>{if(location.hash!=='#misiones')el=null});
-
-function pintar(){
-  if(!el)return;
-  const h=huerfanos();
-  el.innerHTML=`<div class="ch2"><h1>Misiones</h1><button data-nm>${ic('pls',16)} Añadir misión</button></div>
-    <div class="mlist">${listaMisiones().map(fila).join('')||'<p class="vacio">Aún no hay misiones. Pulsa «Añadir misión» para crear la primera.</p>'}</div>
-    ${h.length?`<p class="vacio" style="margin-top:16px">Sin misión asignada (su misión ya no existe):</p><div class="ulist">${h.map(u=>filaCuenta(u,sesion())).join('')}</div>`:''}`;
-}
-
-// fila: una misión = bandera, nombre (y debajo el país y cuántas cuentas tiene), sus botones y,
-// debajo, su propio equipo anidado (con sus Editar/Eliminar) — así no hace falta ir a buscarlo
-// a la pantalla «Usuarios», que para el Administrador ya solo muestra el espacio general.
-function fila(m){
-  const equipo=equipoTodos(m.id),n=equipo.length,sub=[m.pais,n?`${n} ${n===1?'cuenta':'cuentas'}`:''].filter(Boolean).join(' · ');
-  const eqEditor=equipoEditor(m.id),inactivo=eqEditor.length>0&&eqEditor.every(u=>u.activo===false);
-  return `<div class="mfila">
-    <div class="mfila-cab">${banderaHtml(m.codigo,m.pais)}<div class="un"><b>${esc(m.nombre)}</b><small>${esc(sub)}</small></div>
-      <div class="mb2">
-        ${eqEditor.length?`<button class="sec" data-tog="${m.id}">${inactivo?'Reactivar equipo':'Desactivar equipo'}</button>`:''}
-        <button class="sec" data-ed="${m.id}">${ic('edt',15)} Editar</button>
-        <button class="ic rj" data-el="${m.id}" aria-label="Eliminar la misión ${esc(m.nombre)}" title="Eliminar">${ic('trs',16)}</button>
-      </div>
-    </div>
-    ${equipo.length?`<div class="mroster">${equipo.map(u=>filaCuenta(u,sesion())).join('')}</div>`:''}
-  </div>`;
-}
-
-function clic(e){
-  const b=e.target.closest('button');if(!b||!esNivelAdmin())return;
-  const d=b.dataset;
-  if(b.closest('.ufila')){                      // una cuenta anidada en una misión, o huérfana
-    const u=C.find(x=>x.id===(d.ed||d.el));if(!u)return;
-    if(d.ed)return editarCuenta(u);
-    if(d.el&&confirm('¿Eliminar la cuenta "'+(u.nombre||u.correo)+'"? Dejará de verse en la app, pero su acceso de inicio de sesión no queda totalmente revocado (eso requiere la consola de Firebase). Para solo quitarle el acceso, mejor desactívala desde «Editar».')){
-      eliminar('usuarios',u,'la cuenta "'+(u.nombre||u.correo)+'"',true);
-    }
-    return;
-  }
-  if(d.nm!=null)formulario(null);
-  else if(d.ed)formulario(misionPorId(d.ed));
-  else if(d.tog)alternarEquipo(d.tog);
-  else if(d.el){
-    const m=misionPorId(d.el);if(!m)return;
-    const n=cuentasDe(m);
-    if(n)return alert(`Esta misión tiene ${n} ${n===1?'cuenta':'cuentas'}. Primero pasa esas cuentas a otra misión, o elimínalas (desde esta misma pantalla).`);
-    eliminar('misiones',m,'la misión "'+m.nombre+'"');
-  }
-}
-
-// alternarEquipo: activa o desactiva de un solo golpe a las cuentas Misión y Editor de misión
-// de esta misión (no toca a los Usuarios que solo ven).
-function alternarEquipo(id){
-  const eq=equipoEditor(id);if(!eq.length)return;
-  const m=misionPorId(id);if(!m)return;
-  const activar=eq.every(u=>u.activo===false);
-  const pregunta=`¿${activar?'Reactivar':'Desactivar'} el equipo de "${m.nombre}"? Esto ${activar?'permite':'bloquea'} el inicio de sesión de las cuentas Misión y Editor de misión (no afecta a los Usuarios que solo ven).`;
-  if(!confirm(pregunta))return;
-  eq.forEach(u=>guardar('usuarios',u.id,{activo:activar}));
-  aviso(activar?'Equipo reactivado.':'Equipo desactivado.');
-}
-
-// ---------------------------------------------------------------------
-// 5. FORMULARIO  (m = null para una misión nueva, o la misión a editar)
-// ---------------------------------------------------------------------
-function formulario(m){
-  const nueva=!m;
-  if(!nueva&&!m.id)return;
-  const o=modal(`<div class="mh"><h2>${nueva?'Añadir misión':'Editar misión'}</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
-    <label class="fl2" style="margin-bottom:12px">País${selectorBandera({id:'fp',name:'pais',placeholder:'Elige un país…',valor:m?m.codigo:'',opciones:PAISES.map(([c,n])=>({valor:c,texto:n,codigo:c}))})}</label>
-    <label class="fl2" style="margin-bottom:12px">Nombre de la misión<input id="fn" value="${esc(m?m.nombre:'')}" autocomplete="off"></label>
-    <p class="error" role="alert" hidden></p>
-    <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Guardar</button></div>`);
-  const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
-  activarSelectores(o);
-  const aceptar=()=>{
-    const codigo=$('#fp',o).value,nombre=$('#fn',o).value.trim();
-    if(!codigo)return err('Elige un país.');
-    if(!nombre)return err('Escribe el nombre de la misión.');
-    if(M.some(x=>x.id!==(m&&m.id)&&x.codigo===codigo&&alfa(x.nombre,nombre)===0))return err('Ya existe una misión con ese nombre en ese país.');
-    const datos={codigo,pais:NOMBRE_PAIS[codigo],nombre};
-    if(nueva)crear('misiones',datos);else guardar('misiones',m.id,datos);
-    o.remove();aviso(nueva?'Misión añadida.':'Cambios guardados.');
-  };
-  o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.id==='ok')aceptar()};
-  o.onkeydown=e=>{if(e.key==='Enter'&&e.target.tagName!=='SELECT'&&!e.target.closest('.sb')){e.preventDefault();aceptar()}};
-  const primero=nueva?$('.sb-btn',o):$('#fn',o);if(primero)primero.focus();
-}
