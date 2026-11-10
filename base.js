@@ -59,7 +59,7 @@ export async function crearCuentaComoAdmin(correo,clave){
 //  - Si un editor no trae editorDe, se trata como Editor de misión (lo más restringido).
 let usuarioActual=null;
 export const sesion=()=>usuarioActual;
-export function establecerSesion(u){usuarioActual=u}
+export function establecerSesion(u){usuarioActual=u;dispatchEvent(new Event('ambitocambio'))}
 export const esEditorAdmin=u=>!!u&&u.rol==='editor'&&u.editorDe==='admin';
 export const esEditorMision=u=>!!u&&u.rol==='editor'&&u.editorDe!=='admin';
 // esNivelAdmin: poder de Administrador (el Administrador y su Editor).

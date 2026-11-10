@@ -1,5 +1,6 @@
 // ===== PANTALLA: CALENDARIO (mes + panel de detalles del día) =====
 import {$,esc,guardar,crear,eliminar,vistas,ic,modal,escucharPropio,puedeEditar,ambitoActual} from "./base.js";
+import {E as ED,alCambiar} from "./estado.js";
 
 const st=document.createElement('style');
 st.textContent=`.cols{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}
@@ -61,7 +62,9 @@ const pill=e=>`<span class="p" style="background:${e.color}" aria-hidden="true">
 
 escucharPropio('eventos',l=>{E=l;pCal();if(!form)pPan()});
 escucharPropio('dias',l=>{D=l;pCal();if(!form)pPan()});
-escucharPropio('repertorios',l=>{R=l;pCal();if(!form)pPan()});   // los llena la Parte 3
+// Los repertorios (ya filtrados por misión) se leen de estado.js en vez de escucharlos por
+// cuenta propia, para no leer la colección dos veces (ver el comentario al principio de ese archivo).
+alCambiar(()=>{R=ED.repertorios;pCal();if(!form)pPan()});   // los llena la Parte 3
 vistas.calendario=e=>{
   el=e;form=null;sel=ymd(new Date());mes=new Date();mes.setDate(1);
   el.innerHTML='<div class="cols"><section class="c2" id="cal" aria-label="Calendario del mes"></section><aside class="c2 pan" id="pan" aria-live="polite"></aside></div>';

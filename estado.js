@@ -1,19 +1,28 @@
 // =====================================================================
 //  ESTADO.JS  ·  Datos compartidos
-//  Aquí se leen de Firebase los álbumes, canciones y etiquetas UNA sola vez.
-//  Los demás archivos los usan así:   E.albumes   E.canciones   E.etiquetas
+//  Aquí se leen de Firebase los álbumes, canciones, etiquetas y
+//  repertorios UNA sola vez. Los demás archivos los usan así:
+//     E.albumes   E.canciones   E.etiquetas   E.repertorios
+//
+//  Antes, calendario.js/repertorio.js/milista.js tenían cada uno su
+//  propio listener sobre las mismas colecciones (leyéndolas varias
+//  veces por sesión), y el de repertorio.js ni siquiera filtraba por
+//  misión (igual que el bug que se corrigió en escalas.js): mostraba,
+//  y dejaba editar o borrar, canciones/álbumes/repertorios de
+//  CUALQUIER misión en el buscador y la lista de Repertorio.
 //
 //  Para enterarte cuando algo cambia:
 //     const dejarDeEscuchar = alCambiar(() => { ...tu código... });
 // =====================================================================
-import {escuchar,guardar,visibleBiblioteca} from "./base.js";
+import {escuchar,escucharPropio,guardar,visibleBiblioteca} from "./base.js";
 
-export const E={albumes:[],canciones:[],etiquetas:[]};
+export const E={albumes:[],canciones:[],etiquetas:[],repertorios:[]};
 
 // ---------- Lista de quienes quieren enterarse de los cambios ----------
 const oyentes=[];
 export function alCambiar(funcion){
   oyentes.push(funcion);
+  funcion();   // por si ya había datos cuando alguien se suscribe (si no, se quedaría con el estado inicial vacío para siempre)
   return ()=>{const i=oyentes.indexOf(funcion);if(i>=0)oyentes.splice(i,1)};   // devuelve cómo dejar de escuchar
 }
 const avisar=()=>oyentes.slice().forEach(f=>f());
@@ -41,3 +50,8 @@ escuchar('etiquetas',l=>{
   if(!l.length)ETIQUETAS_BASE.forEach(n=>guardar('etiquetas','b-'+n.toLowerCase().replace(/\W+/g,'-'),{nombre:n}));   // crea las etiquetas base si no hay ninguna
   avisar();
 });
+
+// Repertorios (y las «Mi lista», que viven en la misma colección): ya filtrados por misión.
+// Cada pantalla que los use (repertorio.js, calendario.js, milista.js) aplica su propio filtro
+// extra sobre esta misma lista (p.ej. sin «Mi lista», o solo las de un día, o solo las propias).
+escucharPropio('repertorios',l=>{E.repertorios=l;avisar()});

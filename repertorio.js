@@ -1,8 +1,9 @@
 // ===== PANTALLA: REPERTORIO (misa y evento, vista previa y PDF) =====
-import {$,esc,guardar,crear,escuchar,eliminar,vistas,ic,modal,aviso} from "./base.js";
+import {$,esc,guardar,crear,eliminar,vistas,ic,modal,aviso} from "./base.js";
 import {MOM,MES,fechaLarga,cancion,textosDespues,esPeticiones,lineasTx,lineasTxHtml,fcss,OKC} from "./hoja.js";
 import {FIJAS,PROPOR,colorOk,CT} from "./formato.js";
 import {elegirEscala,textoEquipo,equipoDe,alCambiarEquipos} from "./equipos.js";
+import {E,alCambiar} from "./estado.js";
 
 const st=document.createElement('style');
 st.textContent=`[data-vista=repertorio] .rcols{display:grid;grid-template-columns:400px minmax(0,1fr);gap:24px;align-items:start}
@@ -77,7 +78,10 @@ const alb=c=>A.find(a=>a.id===c.albumId)?.nombre||'';
 const titAlb=c=>`<span>${esc(c.titulo)}</span>`+(alb(c)?`<small>${esc(alb(c))}</small>`:'');
 const ref=()=>{if(el)rep?pder():lista()};
 alCambiarEquipos(()=>{if(el&&rep){pizq();pder()}});
-escuchar('canciones',l=>{C=l;ref()});escuchar('etiquetas',l=>{T=l;ref()});escuchar('albumes',l=>{A=l});escuchar('repertorios',l=>{R=l.filter(r=>!r.miLista);ref()});   // Chigo: la lista de repertorios ya no incluye las de «Mi lista» (miLista:true)
+// Los datos (ya filtrados por misión, ver estado.js) se leen de ahí en vez de escucharlos por
+// cuenta propia: antes esto leía canciones/álbumes SIN filtrar por misión (mismo tipo de bug
+// que se corrigió en escalas.js), y encima los leía de nuevo aunque ya los tuviera estado.js.
+alCambiar(()=>{C=E.canciones;T=E.etiquetas;A=E.albumes;R=E.repertorios.filter(r=>!r.miLista);ref()});   // Chigo: la lista de repertorios ya no incluye las de «Mi lista» (miLista:true)
 const rand=()=>Math.random().toString(36).slice(2,8);
 const sec=id=>rep.secciones.find(s=>s.id===id);
 // ===== CHIGO · Etiquetas separadas en «Misas» y «Otros» (ver etiquetas.js) =====

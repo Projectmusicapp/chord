@@ -22,7 +22,7 @@
 //  (dibujar una lista), repertorio.js (ocultar listas y etiquetas de
 //  eventos) y etiquetas.js (grupos Misas / Otros).
 // =====================================================================
-import {$,esc,guardar,crear,escuchar,eliminar,vistas,ic,modal,aviso,sesion} from "./base.js";
+import {$,esc,guardar,crear,eliminar,vistas,ic,modal,aviso,sesion} from "./base.js";
 import {E,alCambiar} from "./estado.js";
 import {cancion} from "./hoja.js";                  // dibuja la canción (título y letra) igual que la vista previa de Repertorio y el enlace de compartir
 
@@ -60,8 +60,12 @@ const alb=c=>(E.albumes.find(a=>a.id===c.albumId)||{}).nombre||'';
 const cuenta=r=>{const n=cancionesDe(r).length;return n?n+(n>1?' canciones':' canción'):'Sin canciones'};
 const enlace=r=>location.origin+location.pathname+'#ver/'+r.id;
 
-escuchar('repertorios',l=>{R=l;ov={};pintar()});
-alCambiar(()=>{if(el&&abierta)pintar()});          // las canciones o etiquetas cargaron o cambiaron
+// Los repertorios (ya filtrados por misión) se leen de estado.js en vez de escucharlos por
+// cuenta propia, para no leer la colección dos veces (ver el comentario al principio de ese
+// archivo) — «Mi lista» igual solo muestra las propias (ver mias(), arriba). alCambiar() avisa
+// de cualquier cambio (también canciones/álbumes/etiquetas); «ov» (canción añadida mientras se
+// espera la copia de Firebase) solo se limpia cuando lo que cambió fue de verdad «repertorios».
+alCambiar(()=>{if(R!==E.repertorios){R=E.repertorios;ov={}}pintar()});
 
 vistas.milista=e=>{
   el=e;abierta=null;
