@@ -16,8 +16,9 @@
 //   4. PANTALLA ............. la lista de misiones y sus botones
 //   5. FORMULARIO ........... la ventanita para añadir o editar una misión
 // =====================================================================
-import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,esNivelAdmin} from "./base.js";
+import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,esNivelAdmin,sesion} from "./base.js";
 import {BANDERAS} from "./banderas.js";
+import {fila as filaCuenta,formEditar as editarCuenta} from "./usuarios.js";
 
 // ---------------------------------------------------------------------
 // 1. PAÍSES  [código, nombre]  (toda América y Puerto Rico, en español).
@@ -115,15 +116,22 @@ escuchar('misiones',l=>{M=l;marcarListo();if(el)pintar();oyentes.forEach(f=>f())
   err=>{console.error('No se pudieron leer las misiones:',err);marcarListo()});   // si falla la lectura, la app no se queda esperando
 escuchar('usuarios',l=>{C=l;if(el)pintar()});
 const cuentasDe=m=>C.filter(u=>u.misionId===m.id).length;
+// equipoTodos: todas las cuentas de esta misión (cualquier nivel), para anidarlas en su tarjeta
+// en vez de mezclarlas con las demás en la pantalla «Usuarios» (ver cuentasVisibles en usuarios.js).
+const equipoTodos=id=>C.filter(u=>u.misionId===id).sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
+// equipoEditor: solo las cuentas con poder de edición de esta misión (Misión y Editor de misión),
+// para el botón de activar/desactivar en bloque (no incluye a los Usuarios que solo ven).
+const equipoEditor=id=>C.filter(u=>u.misionId===id&&(u.rol==='mision'||(u.rol==='editor'&&u.editorDe==='mision')));
+// huerfanos: cuentas cuya misión ya no existe (se borró la misión a la que pertenecían). Sin
+// esto quedarían invisibles (y por lo tanto imposibles de gestionar) en esta pantalla.
+const huerfanos=()=>C.filter(u=>u.misionId&&!misionPorId(u.misionId));
 
 // ---------------------------------------------------------------------
 // 3. ESTILOS
 // ---------------------------------------------------------------------
 const hoja=document.createElement('style');
 hoja.textContent=`[data-vista=misiones] .mlist{display:grid;gap:8px;margin-top:14px}
-.mfila{display:flex;align-items:center;gap:14px;background:var(--capa);border-radius:var(--r-m);padding:10px 12px;flex-wrap:wrap}
-.mfila .un{flex:1;min-width:160px}.mfila b{display:block}.mfila small{display:block;color:var(--gris);font-weight:500}
-.mfila .mb2{display:flex;gap:6px}
+.mfila{display:flex;flex-direction:column;gap:10px;background:var(--capa);border-radius:var(--r-m);padding:10px 12px}
 .bandera{width:34px;height:25px;flex:none;display:block;object-fit:contain}.bandera.vacia{background:var(--suave);border-radius:4px}
 /* Selector con banderas (reemplaza al <select>, que no puede mostrar imágenes) */
 .sb{position:relative;display:block;width:100%}
@@ -138,7 +146,20 @@ hoja.textContent=`[data-vista=misiones] .mlist{display:grid;gap:8px;margin-top:1
 .sb .sb-op{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding:6px 12px;background:transparent;color:var(--tx);border:0;border-radius:0;font-weight:600;text-align:left;justify-content:flex-start}
 .sb .sb-op:hover,.sb .sb-op:focus-visible{filter:none;background:var(--capa)}
 .sb .sb-op[aria-selected=true]{background:var(--suave);color:var(--azul)}
-.sb .bandera{width:28px;height:21px}`;
+.sb .bandera{width:28px;height:21px}
+.mfila-cab{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mfila-cab .un{flex:1;min-width:160px}.mfila-cab b{display:block}.mfila-cab small{display:block;color:var(--gris);font-weight:500}
+.mfila-cab .mb2{display:flex;gap:6px;flex-wrap:wrap}
+.mroster{display:grid;gap:6px;border-top:1px solid var(--linea);padding-top:10px;margin-top:2px}
+[data-vista=misiones] .ulist{display:grid;gap:8px}
+[data-vista=misiones] .ufila{display:flex;align-items:center;gap:12px;background:var(--blanco);border-radius:var(--r-m);padding:10px 12px;flex-wrap:wrap}
+[data-vista=misiones] .ufila .un{flex:1;min-width:160px}
+[data-vista=misiones] .ufila b{display:block}
+[data-vista=misiones] .ufila small{display:block;color:var(--gris);font-weight:500}
+[data-vista=misiones] .rolchip{display:inline-block;background:var(--suave);color:var(--azul);border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:700}
+[data-vista=misiones] .ufila.inactiva{opacity:.55}
+[data-vista=misiones] .mb2{display:flex;gap:6px;flex-wrap:wrap}
+[data-vista=misiones] .pend{display:inline-block;background:var(--oro-claro);color:var(--oro-texto);border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}`;
 document.head.append(hoja);
 
 // ---------------------------------------------------------------------
@@ -152,28 +173,62 @@ addEventListener('hashchange',()=>{if(location.hash!=='#misiones')el=null});
 
 function pintar(){
   if(!el)return;
+  const h=huerfanos();
   el.innerHTML=`<div class="ch2"><h1>Misiones</h1><button data-nm>${ic('pls',16)} Añadir misión</button></div>
-    <div class="mlist">${listaMisiones().map(fila).join('')||'<p class="vacio">Aún no hay misiones. Pulsa «Añadir misión» para crear la primera.</p>'}</div>`;
+    <div class="mlist">${listaMisiones().map(fila).join('')||'<p class="vacio">Aún no hay misiones. Pulsa «Añadir misión» para crear la primera.</p>'}</div>
+    ${h.length?`<p class="vacio" style="margin-top:16px">Sin misión asignada (su misión ya no existe):</p><div class="ulist">${h.map(u=>filaCuenta(u,sesion())).join('')}</div>`:''}`;
 }
 
-// fila: una misión = bandera, nombre (y debajo el país y cuántas cuentas tiene) y sus botones.
+// fila: una misión = bandera, nombre (y debajo el país y cuántas cuentas tiene), sus botones y,
+// debajo, su propio equipo anidado (con sus Editar/Eliminar) — así no hace falta ir a buscarlo
+// a la pantalla «Usuarios», que para el Administrador ya solo muestra el espacio general.
 function fila(m){
-  const n=cuentasDe(m),sub=[m.pais,n?`${n} ${n===1?'cuenta':'cuentas'}`:''].filter(Boolean).join(' · ');
-  return `<div class="mfila">${banderaHtml(m.codigo,m.pais)}<div class="un"><b>${esc(m.nombre)}</b><small>${esc(sub)}</small></div>
-    <div class="mb2"><button class="sec" data-ed="${m.id}">${ic('edt',15)} Editar</button><button class="ic rj" data-el="${m.id}" aria-label="Eliminar la misión ${esc(m.nombre)}" title="Eliminar">${ic('trs',16)}</button></div></div>`;
+  const equipo=equipoTodos(m.id),n=equipo.length,sub=[m.pais,n?`${n} ${n===1?'cuenta':'cuentas'}`:''].filter(Boolean).join(' · ');
+  const eqEditor=equipoEditor(m.id),inactivo=eqEditor.length>0&&eqEditor.every(u=>u.activo===false);
+  return `<div class="mfila">
+    <div class="mfila-cab">${banderaHtml(m.codigo,m.pais)}<div class="un"><b>${esc(m.nombre)}</b><small>${esc(sub)}</small></div>
+      <div class="mb2">
+        ${eqEditor.length?`<button class="sec" data-tog="${m.id}">${inactivo?'Reactivar equipo':'Desactivar equipo'}</button>`:''}
+        <button class="sec" data-ed="${m.id}">${ic('edt',15)} Editar</button>
+        <button class="ic rj" data-el="${m.id}" aria-label="Eliminar la misión ${esc(m.nombre)}" title="Eliminar">${ic('trs',16)}</button>
+      </div>
+    </div>
+    ${equipo.length?`<div class="mroster">${equipo.map(u=>filaCuenta(u,sesion())).join('')}</div>`:''}
+  </div>`;
 }
 
 function clic(e){
   const b=e.target.closest('button');if(!b||!esNivelAdmin())return;
   const d=b.dataset;
+  if(b.closest('.ufila')){                      // una cuenta anidada en una misión, o huérfana
+    const u=C.find(x=>x.id===(d.ed||d.el));if(!u)return;
+    if(d.ed)return editarCuenta(u);
+    if(d.el&&confirm('¿Eliminar la cuenta "'+(u.nombre||u.correo)+'"? Dejará de verse en la app, pero su acceso de inicio de sesión no queda totalmente revocado (eso requiere la consola de Firebase). Para solo quitarle el acceso, mejor desactívala desde «Editar».')){
+      eliminar('usuarios',u,'la cuenta "'+(u.nombre||u.correo)+'"',true);
+    }
+    return;
+  }
   if(d.nm!=null)formulario(null);
   else if(d.ed)formulario(misionPorId(d.ed));
+  else if(d.tog)alternarEquipo(d.tog);
   else if(d.el){
     const m=misionPorId(d.el);if(!m)return;
     const n=cuentasDe(m);
-    if(n)return alert(`Esta misión tiene ${n} ${n===1?'cuenta':'cuentas'}. Primero pasa esas cuentas a otra misión, o elimínalas (menú de tu cuenta → Configuración → Editar).`);
+    if(n)return alert(`Esta misión tiene ${n} ${n===1?'cuenta':'cuentas'}. Primero pasa esas cuentas a otra misión, o elimínalas (desde esta misma pantalla).`);
     eliminar('misiones',m,'la misión "'+m.nombre+'"');
   }
+}
+
+// alternarEquipo: activa o desactiva de un solo golpe a las cuentas Misión y Editor de misión
+// de esta misión (no toca a los Usuarios que solo ven).
+function alternarEquipo(id){
+  const eq=equipoEditor(id);if(!eq.length)return;
+  const m=misionPorId(id);if(!m)return;
+  const activar=eq.every(u=>u.activo===false);
+  const pregunta=`¿${activar?'Reactivar':'Desactivar'} el equipo de "${m.nombre}"? Esto ${activar?'permite':'bloquea'} el inicio de sesión de las cuentas Misión y Editor de misión (no afecta a los Usuarios que solo ven).`;
+  if(!confirm(pregunta))return;
+  eq.forEach(u=>guardar('usuarios',u.id,{activo:activar}));
+  aviso(activar?'Equipo reactivado.':'Equipo desactivado.');
 }
 
 // ---------------------------------------------------------------------
