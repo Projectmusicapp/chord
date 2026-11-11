@@ -277,20 +277,17 @@ function pintarAdmin(actor){
 
     <section class="seccfg">
       <div class="ch2"><h2>${ic('usr',19)} Usuarios</h2><button data-nu>${ic('pls',16)} Nueva cuenta</button></div>
-      <p class="vacio">Administradores y Editores del administrador, con acceso a toda la app.</p>
       <div class="ulist">${admins.map(u=>fila(u,actor)).join('')||'<p class="vacio">Aún no hay cuentas aquí.</p>'}</div>
     </section>
 
     <section class="seccfg">
       <div class="ch2"><h2>${ic('pin',19)} Misiones</h2><button data-nm>${ic('pls',16)} Añadir misión</button></div>
-      <p class="vacio">Cada misión es un espacio independiente: su propio calendario, escalas y canciones privadas.</p>
       <div class="mlist">${misiones.map(misionFila).join('')||'<p class="vacio">Aún no hay misiones. Pulsa «Añadir misión» para crear la primera.</p>'}</div>
       ${h.length?`<p class="vacio" style="margin-top:16px">Sin misión asignada (su misión ya no existe):</p><div class="ulist">${h.map(u=>fila(u,actor)).join('')}</div>`:''}
     </section>
 
     <section class="seccfg">
       <div class="ch2"><h2>${ic('cfg',19)} Administración</h2></div>
-      <p class="vacio">Afecta a toda la app, para todas las misiones por igual.</p>
       <div class="ulist">
         <div class="ufila">
           <div class="un"><b>Logo de la app</b><small>Se muestra en la cabecera y en el icono de la pestaña.</small></div>
