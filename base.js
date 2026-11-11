@@ -202,7 +202,7 @@ function irA(){
   $('#nav').innerHTML=ver?'':menu.map(([k,i,n])=>`<a href="#${k}" class="${k===v?'on':''}" ${k===v?'aria-current="page"':''}>${ic(i,18)}<span>${n}</span></a>`).join('');
   const el=$('#app');el.innerHTML='';el.className='';el.dataset.vista=v;
   el.onclick=el.oninput=el.onchange=el.onkeydown=null;   // quita lo que dejó la pantalla anterior
-  const m=menu.find(x=>x[0]===v);document.title=(m?m[2]+' · ':'')+(cfg.nombre||'Músicapp');
+  const m=menu.find(x=>x[0]===v);document.title=(m?m[2]+' · ':'')+(apariencia().nombre||'Músicapp');
   if(vistaAnterior!==v){window.scrollTo(0,0);vistaAnterior=v}
   if(ver&&vistas.ver)return vistas.ver(el,v.slice(4));
   (vistas[v]||(e=>{if(todoCargado)e.innerHTML='<div class="c2"><h2>Esta página no existe</h2><p><a href="#inicio">Volver al inicio</a></p></div>'}))(el);
@@ -216,7 +216,13 @@ function irA(){
 // (sección de administración, solo para el nivel Administrador) — ver usuarios.js.
 let cfg={nombre:'Ministerio de música',logo:''},listo=0;
 export const configActual=()=>cfg;
-const cabecera=()=>{$('#logo').innerHTML=(cfg.logo?`<img src="${cfg.logo}" alt="">`:`<span class="lg">${ic('mus',20)}</span>`)+`<span>${esc(cfg.nombre)}</span>`};
+// Apariencia del botón de inicio (logo y nombre): por defecto la general (cfg); usuarios.js puede
+// sobreponer la de la misión de la cuenta con definirApariencia().
+let aparienciaFn=null;
+const apariencia=()=>({...cfg,...((aparienciaFn&&aparienciaFn())||{})});
+const cabecera=()=>{const a=apariencia();$('#logo').innerHTML=(a.logo?`<img src="${a.logo}" alt="">`:`<span class="lg">${ic('mus',20)}</span>`)+`<span>${esc(a.nombre)}</span>`};
+export const definirApariencia=fn=>{aparienciaFn=fn;cabecera()};
+export const refrescarCabecera=()=>cabecera();
 
 export const hoyLargo=()=>{const t=new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'});return t.charAt(0).toUpperCase()+t.slice(1)};
 vistas.inicio=el=>{el.innerHTML='<div class="inicio"></div>'};

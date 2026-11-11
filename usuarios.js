@@ -11,7 +11,7 @@
 //   admin ...... control total: biblioteca general, puede ocultar álbumes
 //                de la biblioteca general, crear cuentas de cualquier nivel
 //                y cambiar el nivel de cualquier cuenta (incluso degradar a
-//                otro Administrador a Editor). Solo este nivel cambia niveles.
+//                otro Administrador a Editor). Su Editor también cambia niveles (menos el de Administrador).
 //   editor ..... solo se crea desde Configuración (nunca por autorregistro).
 //     editorDe:'admin'   Editor del administrador: hace todo lo que el
 //                        Administrador, menos editar/eliminar a un Administrador
@@ -23,7 +23,7 @@
 //   mision ..... un equipo de una MISIÓN. Ve la biblioteca general sin poder
 //                editarla. Tiene la biblioteca privada, el calendario, las
 //                escalas y los repertorios de SU misión. Puede crear cuentas
-//                «mision», «editor de misión» y «usuario» para su misma misión.
+//                «editor de misión» y «usuario» para su misma misión.
 //   usuario .... solo ve (su misión + la biblioteca general). No crea ni edita
 //                nada. También puede llegar aquí por autorregistro (ver
 //                login.js): esas cuentas quedan con requiereVerificacion = true
@@ -38,16 +38,18 @@
 //  Una cuenta creada desde «Nueva cuenta» queda con requiereVerificacion:false:
 //  se confía en quien la dio de alta. Solo el autorregistro exige verificar.
 // =====================================================================
-import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,esAdministrador,esEditorAdmin,esEditorMision,puedeEditar,configActual,hoyLargo,auth,cambiarMiClave,crearCuentaAuth,crearCuentaComoAdmin,enviarVerificacion} from "./base.js";
+import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,esAdministrador,esEditorAdmin,esEditorMision,puedeEditar,configActual,hoyLargo,auth,cambiarMiClave,crearCuentaAuth,crearCuentaComoAdmin,enviarVerificacion,definirApariencia,refrescarCabecera,recargarUsuarioAuth} from "./base.js";
 import {ventana as abrirRespaldo} from "./respaldo.js";
 import {E,alCambiar} from "./estado.js";
 import {misionesCargadas,alCambiarMisiones,listaMisiones,misionPorId,etiquetaMision,PAISES,alfa,selectorBandera,activarSelectores,banderaHtml} from "./misiones.js";
 const NOMBRE_PAIS=Object.fromEntries(PAISES);
 
 // NIVELES: los 5 «niveles» que se pueden elegir (el Editor tiene dos variantes).
-const NIVELES={admin:'Administrador','editor-admin':'Editor del administrador','editor-mision':'Editor de misión',mision:'Misión',usuario:'Usuario (solo ver)'};
+const NIVELES={admin:'Administrador','editor-admin':'Editor del administrador','editor-mision':'Editor de misión',mision:'Misión',usuario:'Usuario'};
 const nivelDe=u=>u.rol==='editor'?(u.editorDe==='admin'?'editor-admin':'editor-mision'):(u.rol||'usuario');
 const etiquetaRol=u=>NIVELES[nivelDe(u)]||u.rol;
+// Etiqueta corta del nivel según dónde se muestre. Misión y Usuario no llevan etiqueta.
+const etiquetaCorta=(u,ctx)=>{const n=nivelDe(u);if(n==='admin')return 'Administrador';if(n==='editor-admin')return 'Editor';if(n==='editor-mision')return ctx==='roster'?'Editor de misión':'Editor';return ''};
 const necesitaMision=n=>n!=='admin'&&n!=='editor-admin';        // estos dos trabajan en el espacio general
 // datosDeNivel: los campos que se guardan en la cuenta para cada nivel
 const datosDeNivel=n=>({admin:{rol:'admin',editorDe:null},'editor-admin':{rol:'editor',editorDe:'admin'},'editor-mision':{rol:'editor',editorDe:'mision'},mision:{rol:'mision',editorDe:null},usuario:{rol:'usuario',editorDe:null}})[n];
@@ -55,13 +57,16 @@ const datosDeNivel=n=>({admin:{rol:'admin',editorDe:null},'editor-admin':{rol:'e
 const st=document.createElement('style');
 st.textContent=`header .menu-usuario{position:relative;margin-left:auto}
 header .btn-usuario{background:#ffffff14;color:#DDE3F5;min-height:36px;padding:6px 12px;font-size:14px;flex:none;display:inline-flex;align-items:center;gap:6px;max-width:160px}
-header .btn-usuario span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header .btn-usuario .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:110px}
+.av{width:28px;height:28px;border-radius:50%;object-fit:cover;flex:none;display:inline-grid;place-items:center;background:var(--oro);color:var(--azul);font-weight:800;line-height:1}
+header .avw{display:inline-flex;flex:none}
 header .btn-usuario:hover{background:#ffffff26;filter:none}
-header .dd-usuario{position:absolute;right:0;top:100%;margin-top:6px;z-index:12;background:var(--blanco);border:1px solid var(--linea);border-radius:14px;box-shadow:var(--sombra-2);padding:8px;min-width:200px;display:grid;gap:2px}
-header .dd-usuario .nombre{padding:8px 10px 10px;font-weight:700;color:var(--tx);border-bottom:1px solid var(--linea);margin-bottom:4px}
+header .dd-usuario{position:absolute;right:0;top:100%;margin-top:6px;z-index:12;background:var(--blanco);border:1px solid var(--linea);border-radius:14px;box-shadow:var(--sombra-2);padding:8px;min-width:200px;max-width:min(280px,calc(100vw - 24px));display:grid;gap:2px}
+header .dd-usuario .nombre{padding:8px 10px 10px;font-weight:700;color:var(--tx);border-bottom:1px solid var(--linea);margin-bottom:4px;display:flex;align-items:center;gap:10px;min-width:0}
+header .dd-usuario .nombre .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 header .dd-usuario button{background:transparent;color:var(--tx);justify-content:flex-start;text-align:left;min-height:38px}
 header .dd-usuario button:hover{background:var(--capa);filter:none}
-@media(max-width:480px){header .btn-usuario{max-width:40px;padding:0;justify-content:center}header .btn-usuario span{display:none}}
+@media(max-width:480px){header .btn-usuario{max-width:64px;padding:0 8px;justify-content:center}header .btn-usuario .nm{display:none}}
 .inicio{display:flex;flex-direction:column;gap:24px}
 .bienvenida{background:linear-gradient(135deg,var(--azul),var(--azul-2));border-radius:var(--r-xl);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;box-shadow:var(--sombra-2)}
 .bienvenida h1{color:#fff;margin:0}
@@ -107,7 +112,20 @@ header .dd-usuario button:hover{background:var(--capa);filter:none}
 [data-vista=usuarios] .mfila-cab small{display:block;color:var(--gris);font-weight:500}
 [data-vista=usuarios] .mfila-cab .mb2{display:flex;gap:6px;flex-wrap:wrap}
 [data-vista=usuarios] .mroster{display:grid;gap:6px;border-top:1px solid var(--linea);padding-top:10px;margin-top:2px}
-[data-vista=usuarios] .mroster .ufila{background:var(--blanco)}`;
+[data-vista=usuarios] .mroster .ufila{background:var(--blanco)}
+[data-vista=usuarios] .mtog{display:flex;align-items:center;gap:12px;flex:1;min-width:0;min-height:44px;padding:0;background:transparent;color:var(--tx);border:0;box-shadow:none;justify-content:flex-start;text-align:left}
+[data-vista=usuarios] .mtog:hover{filter:none;background:transparent}
+[data-vista=usuarios] .mtog b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-vista=usuarios] .mtog .flecha{display:inline-flex;transition:transform .2s}
+[data-vista=usuarios] .mtog[aria-expanded=true] .flecha{transform:rotate(90deg)}
+[data-vista=usuarios] .mcab{display:flex;align-items:center;gap:6px}
+[data-vista=usuarios] .mas{flex:none;width:36px;height:36px;min-height:0;padding:0;display:inline-grid;place-items:center;background:transparent;color:var(--gris);border:0;box-shadow:none;border-radius:50%;margin-left:auto}
+[data-vista=usuarios] .mas:hover,[data-vista=usuarios] .mas:focus-visible{filter:none;background:var(--suave);color:var(--azul)}
+.menu-pop{position:fixed;z-index:60;background:var(--blanco);border:1px solid var(--linea);border-radius:12px;box-shadow:var(--sombra-2);padding:6px;min-width:176px;display:grid;gap:2px}
+.menu-pop button{display:flex;align-items:center;gap:8px;width:100%;min-height:38px;padding:6px 10px;background:transparent;color:var(--tx);border:0;box-shadow:none;border-radius:8px;justify-content:flex-start;text-align:left;font-weight:600}
+.menu-pop button:hover,.menu-pop button:focus-visible{filter:none;background:var(--capa)}
+.menu-pop button.peligro{color:var(--rojo,#C0392B)}
+.menu-pop hr{border:0;border-top:1px solid var(--linea);margin:4px 0;width:100%}`;
 document.head.append(st);
 
 let U=[],listo=false,el=null;
@@ -122,7 +140,7 @@ escuchar('usuarios',l=>{
   if(el)pintar();
   pintarInicio();
 });
-alCambiarMisiones(()=>{if(el)pintar();pintarInicio()});   // si cambian las misiones, se vuelven a dibujar los nombres
+alCambiarMisiones(()=>{if(el)pintar();pintarInicio();refrescarCabecera()});   // si cambian las misiones, se vuelven a dibujar los nombres
 
 // ---------- A qué misión pertenecen las cuentas ----------
 // miMision: la misión de esta cuenta (su «misionId»). El Administrador y su Editor no tienen (null: trabajan en el espacio general).
@@ -139,6 +157,9 @@ function misionDe(u){
   const m=misionPorId(u.misionId);
   return m?etiquetaMision(m):'(misión eliminada)';
 }
+// Botón de inicio (logo y nombre): las cuentas de una misión ven el de SU misión (si lo cambió); el resto, el general.
+definirApariencia(()=>{const a=sesion();if(!a||nivelAdminU(a))return null;const m=misionPorId(a.misionId);if(!m)return null;const r={};if(m.logo)r.logo=m.logo;if(m.nombreApp)r.nombre=m.nombreApp;return r});
+addEventListener('ambitocambio',refrescarCabecera);
 
 // ---------- Primera cuenta / autorregistro (los llama login.js) ----------
 export async function crearPrimerAdmin(nombre,correo,clave){
@@ -158,8 +179,8 @@ function rolesCreables(actor){
   const n=k=>[k,NIVELES[k]];
   if(actor.rol==='admin')return ['admin','editor-admin','editor-mision','mision','usuario'].map(n);
   if(esEditorAdmin(actor))return ['editor-admin','editor-mision','mision','usuario'].map(n);   // no crea Administradores
-  if(actor.rol==='mision')return [['mision','Misión (de tu misión)'],['editor-mision','Editor de misión (de tu misión)'],['usuario','Usuario (solo ver)']];
-  if(esEditorMision(actor))return [['editor-mision','Editor de misión (de tu misión)'],['usuario','Usuario (solo ver)']];   // no crea cuentas Misión
+  if(actor.rol==='mision')return [['editor-mision','Editor'],['usuario','Usuario']];
+  if(esEditorMision(actor))return [['editor-mision','Editor'],['usuario','Usuario']];   // no crea cuentas Misión
   return [];
 }
 // cuentasVisibles: el Administrador y su Editor ven aquí solo las cuentas del espacio general
@@ -187,6 +208,17 @@ function puedeEliminarCuenta(u,actor){
   return u.rol!=='editor';
 }
 
+// avatar: foto de perfil redonda; si no hay foto, la inicial del nombre.
+const avatar=(u,s=28)=>{const t=`width:${s}px;height:${s}px;font-size:${Math.round(s*.45)}px`;return u.foto?`<img class="av" style="${t}" src="${u.foto}" alt="">`:`<span class="av" style="${t}" aria-hidden="true">${esc((u.nombre||u.correo||'?').trim().charAt(0).toUpperCase())}</span>`};
+function pintarCuentaEnMenu(u){
+  const c=document.querySelector('header .menu-usuario');if(!c)return;
+  const nm=u.nombre||u.correo||'';
+  c.querySelector('.btn-usuario .avw').innerHTML=avatar(u,28);
+  c.querySelector('.btn-usuario .nm').textContent=nm;
+  c.querySelector('.dd-usuario .nombre .avw').innerHTML=avatar(u,36);
+  c.querySelector('.dd-usuario .nombre .nm').textContent=nm;
+}
+
 // ---------- Menú de usuario en la cabecera: nombre, Mi cuenta, Configuración y Salir ----------
 // (no van en la barra de navegación: son acciones de la cuenta, no secciones de contenido)
 export function montarMenuUsuario(salir){
@@ -195,9 +227,9 @@ export function montarMenuUsuario(salir){
   if(!header||!actor||header.querySelector('.menu-usuario'))return;
   const cont=document.createElement('div');
   cont.className='menu-usuario';
-  cont.innerHTML=`<button class="btn-usuario" aria-haspopup="true" aria-expanded="false"><span>${esc(actor.nombre||actor.correo)}</span> &#9662;</button>
+  cont.innerHTML=`<button class="btn-usuario" aria-haspopup="true" aria-expanded="false"><span class="avw">${avatar(actor,28)}</span><span class="nm">${esc(actor.nombre||actor.correo)}</span> &#9662;</button>
     <div class="dd-usuario" hidden>
-      <div class="nombre">${esc(actor.nombre||actor.correo)}</div>
+      <div class="nombre"><span class="avw">${avatar(actor,36)}</span><span class="nm">${esc(actor.nombre||actor.correo)}</span></div>
       <button data-mc>${ic('usr',15)} Mi cuenta</button>
       ${puedeEditar()?`<button data-cfg>${ic('cfg',15)} Configuración</button>`:''}
       <button data-sal>${ic('out',15)} Salir</button>
@@ -215,9 +247,16 @@ export function montarMenuUsuario(salir){
 // ---------- Pantalla «Mi cuenta» (cualquier rol): datos propios y contraseña ----------
 vistas.cuenta=contenedor=>{
   const actor=sesion();if(!actor)return;
-  const mision=misionDe(actor);
+  const m=actor.rol==='mision'?misionPorId(actor.misionId):null;     // solo la cuenta Misión cambia el botón de inicio de su misión
+  const creador=U.find(x=>x.id===actor.creadoPor);
+  const sinVerificar=!!creador&&(creador.rol==='mision'||esEditorMision(creador))&&!!auth.currentUser&&!auth.currentUser.emailVerified;
+  let foto=actor.foto||'',logoApp=(m&&m.logo)||'';
   contenedor.innerHTML=`<div class="ch2"><h1>Mi cuenta</h1></div>
-    ${mision?`<p style="color:var(--gris)">Misión a la que perteneces: <b>${esc(mision)}</b></p>`:''}
+    ${sinVerificar?`<div style="background:var(--oro-claro);border-radius:var(--r-m);padding:12px 14px;margin-bottom:14px"><b>Verifica tu correo</b><p style="margin:4px 0 10px;color:var(--gris);font-size:13.5px">Tu correo aún no está verificado. Puedes hacerlo cuando quieras: te enviamos un mensaje con un enlace.</p><div class="barra" style="margin:0"><button id="bv">Enviar correo de verificación</button><button class="sec" id="bv2">Ya lo verifiqué</button></div></div>`:''}
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px"><span id="pv" style="display:inline-flex">${avatar({...actor,foto},64)}</span><div class="barra" style="margin:0"><button class="sec" id="bf">${ic('img',16)} Cambiar foto</button><button class="sec" id="bqf" ${foto?'':'hidden'}>${ic('x',16)} Quitar foto</button><input type="file" id="ff" accept="image/*" hidden></div></div>
+    ${m?`<div style="border:1px solid var(--linea);border-radius:var(--r-m);padding:14px;margin:6px 0 16px"><h2 style="margin:0 0 4px;font-size:17px">Botón de inicio</h2><p style="margin:0 0 12px;color:var(--gris);font-size:13.5px">El logo y el nombre que ven arriba a la izquierda tú y todo tu equipo. Si los dejas vacíos se usa el general.</p>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px"><span id="lv" style="display:inline-flex;width:40px;height:40px;align-items:center;justify-content:center"></span><div class="barra" style="margin:0"><button class="sec" id="bl2">${ic('img',16)} Cambiar logo</button><button class="sec" id="bq2">${ic('x',16)} Quitar logo</button><input type="file" id="fl2" accept="image/*" hidden></div></div>
+      <label class="fl2">Nombre<input id="fnapp" value="${esc(m.nombreApp||'')}" placeholder="${esc(configActual().nombre)}" autocomplete="off"></label></div>`:''}
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" value="${esc(actor.nombre||'')}" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Correo<input id="fe" value="${esc(actor.correo||'')}" disabled></label>
     <label class="fl2" style="margin-bottom:12px">Nueva contraseña (vacío = no cambiar)<input id="fc1" type="password" autocomplete="new-password"></label>
@@ -225,8 +264,27 @@ vistas.cuenta=contenedor=>{
     <p class="error" role="alert" hidden></p>
     <button id="ok">Guardar</button>`;
   const err=t=>{const p=$('.error',contenedor);p.textContent=t;p.hidden=!t};
+  const pintaLogo=()=>{const v=$('#lv',contenedor);if(!v)return;v.innerHTML=logoApp?`<img src="${logoApp}" alt="" style="max-width:40px;max-height:40px">`:ic('mus',22);$('#bq2',contenedor).hidden=!logoApp};
+  pintaLogo();
+  contenedor.onchange=async e=>{
+    const f=e.target.files&&e.target.files[0];if(!f)return;
+    if(e.target.id==='ff'){foto=await imagen(f,160);$('#pv',contenedor).innerHTML=avatar({...actor,foto},64);$('#bqf',contenedor).hidden=false}
+    else if(e.target.id==='fl2'){logoApp=await imagen(f,200);pintaLogo()}
+    e.target.value='';
+  };
   contenedor.onclick=async e=>{
-    if(!e.target.closest('#ok'))return;
+    const b=e.target.closest('button');if(!b)return;
+    if(b.id==='bf')return $('#ff',contenedor).click();
+    if(b.id==='bqf'){foto='';$('#pv',contenedor).innerHTML=avatar({...actor,foto:''},64);b.hidden=true;return}
+    if(b.id==='bl2')return $('#fl2',contenedor).click();
+    if(b.id==='bq2'){logoApp='';pintaLogo();return}
+    if(b.id==='bv'){
+      try{await enviarVerificacion(auth.currentUser);aviso('Te enviamos un correo para verificar tu cuenta. Revisa también la carpeta de spam.')}
+      catch(e2){aviso(e2.code==='auth/too-many-requests'?'Demasiados intentos. Espera unos minutos.':'No se pudo enviar el correo.')}
+      return;
+    }
+    if(b.id==='bv2'){try{await recargarUsuarioAuth(auth.currentUser)}catch(e2){}return vistas.cuenta(contenedor)}
+    if(b.id!=='ok')return;
     const nombre=$('#fn',contenedor).value.trim(),c1=$('#fc1',contenedor).value,c2=$('#fc2',contenedor).value;
     if(c1&&c1!==c2)return err('Las contraseñas no coinciden.');
     if(c1&&c1.length<6)return err('La contraseña debe tener al menos 6 caracteres.');
@@ -234,10 +292,11 @@ vistas.cuenta=contenedor=>{
       try{await cambiarMiClave(auth.currentUser,c1)}
       catch(e2){return err(e2.code==='auth/requires-recent-login'?'Por seguridad, cierra sesión y vuelve a entrar antes de cambiar la contraseña.':'No se pudo cambiar la contraseña.')}
     }
-    const cambios={nombre:nombre||actor.correo};
-    guardar('usuarios',actor.id,cambios);
+    const cambios={nombre:nombre||actor.correo,foto};
+    guardar('usuarios',actor.id,cambios).catch(()=>aviso('No se pudo guardar tu perfil.'));
+    if(m)guardar('misiones',m.id,{nombreApp:$('#fnapp',contenedor).value.trim(),logo:logoApp}).catch(()=>aviso('No se pudo guardar el botón de inicio.'));
     establecerSesion({...actor,...cambios});
-    document.querySelectorAll('.menu-usuario .btn-usuario span,.menu-usuario .dd-usuario .nombre').forEach(elx=>elx.textContent=cambios.nombre);
+    pintarCuentaEnMenu({...actor,...cambios});
     aviso('Datos actualizados.');
   };
 };
@@ -252,6 +311,7 @@ addEventListener('hashchange',()=>{if(location.hash!=='#usuarios')el=null});
 
 
 function pintar(){
+  cerrarMenuMas();
   if(!el)return;
   const actor=sesion();if(!actor)return;
   el.innerHTML=esNivelAdmin()?pintarAdmin(actor):pintarEquipo(actor);
@@ -269,7 +329,8 @@ function pintarEquipo(actor){
 // Vista del Administrador (y su Editor): Usuarios (espacio general) / Misiones (con su propio
 // equipo anidado en cada tarjeta) / Administración (nombre, logo, copia de seguridad).
 function pintarAdmin(actor){
-  const admins=cuentasVisibles(actor).sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
+  const rango=u=>u.id===actor.id?0:(u.rol==='admin'?1:2);        // tu cuenta primero, luego los demás Administradores, luego los Editores
+  const admins=cuentasVisibles(actor).sort((a,b)=>rango(a)-rango(b)||(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
   const misiones=listaMisiones();
   const h=huerfanos();
   const cfg=configActual();
@@ -277,13 +338,13 @@ function pintarAdmin(actor){
 
     <section class="seccfg">
       <div class="ch2"><h2>${ic('usr',19)} Usuarios</h2><button data-nu>${ic('pls',16)} Nueva cuenta</button></div>
-      <div class="ulist">${admins.map(u=>fila(u,actor)).join('')||'<p class="vacio">Aún no hay cuentas aquí.</p>'}</div>
+      <div class="ulist">${admins.map(u=>fila(u,actor,'general')).join('')||'<p class="vacio">Aún no hay cuentas aquí.</p>'}</div>
     </section>
 
     <section class="seccfg">
       <div class="ch2"><h2>${ic('pin',19)} Misiones</h2><button data-nm>${ic('pls',16)} Añadir misión</button></div>
       <div class="mlist">${misiones.map(misionFila).join('')||'<p class="vacio">Aún no hay misiones. Pulsa «Añadir misión» para crear la primera.</p>'}</div>
-      ${h.length?`<p class="vacio" style="margin-top:16px">Sin misión asignada (su misión ya no existe):</p><div class="ulist">${h.map(u=>fila(u,actor)).join('')}</div>`:''}
+      ${h.length?`<p class="vacio" style="margin-top:16px">Sin misión asignada (su misión ya no existe):</p><div class="ulist">${h.map(u=>fila(u,actor,'roster')).join('')}</div>`:''}
     </section>
 
     <section class="seccfg">
@@ -317,42 +378,25 @@ function cablearAdministracion(){
 // equipoTodos: todas las cuentas de esta misión (cualquier nivel), para anidarlas en su tarjeta
 // en vez de mezclarlas con las demás en la sección «Usuarios» (ver cuentasVisibles).
 const equipoTodos=id=>U.filter(u=>u.misionId===id).sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
-// equipoEditor: solo las cuentas con poder de edición de esta misión (Misión y Editor de misión),
-// para el botón de activar/desactivar en bloque (no incluye a los Usuarios que solo ven).
-const equipoEditor=id=>U.filter(u=>u.misionId===id&&(u.rol==='mision'||(u.rol==='editor'&&u.editorDe==='mision')));
 // huerfanos: cuentas cuya misión ya no existe (se borró la misión a la que pertenecían). Sin
 // esto quedarían invisibles (y por lo tanto imposibles de gestionar) en esta pantalla.
 const huerfanos=()=>U.filter(u=>u.misionId&&!misionPorId(u.misionId));
+const misAbiertas=new Set();   // misiones desplegadas (se recuerdan aunque la pantalla se vuelva a dibujar)
 
 // misionFila: una misión = bandera, nombre (y debajo el país y cuántas cuentas tiene), sus
 // botones y, debajo, su propio equipo anidado (con sus Editar/Eliminar) — así no hace falta ir
 // a buscarlo a la sección «Usuarios», que para el Administrador ya solo muestra el espacio general.
 function misionFila(m){
   const equipo=equipoTodos(m.id),n=equipo.length,sub=[m.pais,n?`${n} ${n===1?'cuenta':'cuentas'}`:''].filter(Boolean).join(' · ');
-  const eqEditor=equipoEditor(m.id),inactivo=eqEditor.length>0&&eqEditor.every(u=>u.activo===false);
-  const actor=sesion();
+  const actor=sesion(),abierta=misAbiertas.has(m.id);
   return `<div class="mfila">
-    <div class="mfila-cab">${banderaHtml(m.codigo,m.pais)}<div class="un"><b>${esc(m.nombre)}</b><small>${esc(sub)}</small></div>
-      <div class="mb2">
-        ${eqEditor.length?`<button class="sec" data-tog="${m.id}">${inactivo?'Reactivar equipo':'Desactivar equipo'}</button>`:''}
-        <button class="sec" data-med="${m.id}">${ic('edt',15)} Editar</button>
-        <button class="ic rj" data-mel="${m.id}" aria-label="Eliminar la misión ${esc(m.nombre)}" title="Eliminar">${ic('trs',16)}</button>
-      </div>
+    <div class="mcab">
+      <button type="button" class="mtog" data-mt="${m.id}" aria-expanded="${abierta}">${banderaHtml(m.codigo,m.pais)}<b>${esc(m.nombre)}</b><span class="flecha">${ic('rgt',16)}</span></button>
+      <button type="button" class="mas" data-mas="m:${m.id}" aria-haspopup="menu" aria-label="Opciones de la misión ${esc(m.nombre)}" title="Opciones">${PUNTOS}</button>
     </div>
-    ${equipo.length?`<div class="mroster">${equipo.map(u=>fila(u,actor)).join('')}</div>`:''}
+    ${abierta?`<div class="mfila-cab"><div class="un"><small>${esc(sub)}</small></div></div>
+    ${equipo.length?`<div class="mroster">${equipo.map(u=>fila(u,actor,'roster')).join('')}</div>`:''}`:''}
   </div>`;
-}
-
-// alternarEquipo: activa o desactiva de un solo golpe a las cuentas Misión y Editor de misión
-// de esta misión (no toca a los Usuarios que solo ven).
-function alternarEquipo(id){
-  const eq=equipoEditor(id);if(!eq.length)return;
-  const m=misionPorId(id);if(!m)return;
-  const activar=eq.every(u=>u.activo===false);
-  const pregunta=`¿${activar?'Reactivar':'Desactivar'} el equipo de "${m.nombre}"? Esto ${activar?'permite':'bloquea'} el inicio de sesión de las cuentas Misión y Editor de misión (no afecta a los Usuarios que solo ven).`;
-  if(!confirm(pregunta))return;
-  eq.forEach(u=>guardar('usuarios',u.id,{activo:activar}));
-  aviso(activar?'Equipo reactivado.':'Equipo desactivado.');
 }
 
 // formularioMision: ventanita para añadir o editar una misión (m=null para una nueva).
@@ -380,41 +424,77 @@ function formularioMision(m){
   const primero=nueva?$('.sb-btn',o):$('#fn',o);if(primero)primero.focus();
 }
 
-export function fila(u,actor){
-  const edita=puedeEditarCuenta(u,actor),elimina=puedeEliminarCuenta(u,actor);
+export function fila(u,actor,ctx){
+  const edita=puedeEditarCuenta(u,actor);
   const tuya=u.id===actor.id;
   const pendiente=u.requiereVerificacion&&!u.emailVerified&&u.id!==actor.id;
-  const sub=[etiquetaRol(u),misionDe(u)].filter(Boolean).join(' · ');
+  const sub=etiquetaCorta(u,ctx);
   return `<div class="ufila${u.activo===false?' inactiva':''}">
     <div class="un"><b>${esc(u.nombre||u.correo)}${tuya?' (tú)':''}</b><small>${esc(u.correo||'')}${u.activo===false?' · Desactivada':''}</small></div>
-    <span class="rolchip">${esc(sub)}</span>
+    ${sub?`<span class="rolchip">${esc(sub)}</span>`:''}
     ${pendiente?`<span class="pend">Sin verificar correo</span>`:''}
-    ${edita?`<div class="mb2"><button class="sec" data-ed="${u.id}">${ic('edt',15)} Editar</button>${elimina?`<button class="ic rj" data-el="${u.id}" aria-label="Eliminar a ${esc(u.nombre||u.correo)}" title="Eliminar">${ic('trs',16)}</button>`:''}</div>`:''}
+    ${edita?`<button class="mas" data-mas="u:${u.id}" aria-haspopup="menu" aria-label="Opciones de ${esc(u.nombre||u.correo)}" title="Opciones">${PUNTOS}</button>`:''}
   </div>`;
 }
 
 function clic(e){
   const b=e.target.closest('button');if(!b)return;const d=b.dataset;
   if(d.nu!=null)formNuevo();
-  else if(d.ed){const u=U.find(x=>x.id===d.ed);if(u&&puedeEditarCuenta(u,sesion()))formEditar(u)}
-  else if(d.el){
-    const u=U.find(x=>x.id===d.el);if(!u||!puedeEliminarCuenta(u,sesion()))return;
-    if(u.rol==='admin'&&U.filter(x=>x.rol==='admin').length<=1)return alert('Debe quedar al menos una cuenta de Administrador.');
-    if(confirm('¿Eliminar la cuenta "'+(u.nombre||u.correo)+'"? Dejará de verse en la app, pero su acceso de inicio de sesión no queda totalmente revocado (eso requiere la consola de Firebase). Para solo quitarle el acceso, mejor desactívala desde «Editar».')){
-      eliminar('usuarios',u,'la cuenta "'+(u.nombre||u.correo)+'"',true);
-    }
-  }
+  else if(d.mas)menuMas(b,d.mas);
   else if(!esNivelAdmin())return;                 // lo que sigue es solo de Misiones (Administrador y su Editor)
   else if(d.nm!=null)formularioMision(null);
-  else if(d.med)formularioMision(misionPorId(d.med));
-  else if(d.tog)alternarEquipo(d.tog);
-  else if(d.mel){
-    const m=misionPorId(d.mel);if(!m)return;
-    const n=equipoTodos(m.id).length;
-    if(n)return alert(`Esta misión tiene ${n} ${n===1?'cuenta':'cuentas'}. Primero pasa esas cuentas a otra misión, o elimínalas (desde esta misma pantalla).`);
-    eliminar('misiones',m,'la misión "'+m.nombre+'"');
+  else if(d.mt){misAbiertas.has(d.mt)?misAbiertas.delete(d.mt):misAbiertas.add(d.mt);pintar()}
+}
+
+function eliminarCuenta(u){
+  if(!u||!puedeEliminarCuenta(u,sesion()))return;
+  if(u.rol==='admin'&&U.filter(x=>x.rol==='admin').length<=1)return alert('Debe quedar al menos una cuenta de Administrador.');
+  if(confirm('¿Eliminar la cuenta "'+(u.nombre||u.correo)+'"? Dejará de verse en la app, pero su acceso de inicio de sesión no queda totalmente revocado (eso requiere la consola de Firebase). Para solo quitarle el acceso, mejor desactívala desde «Editar».')){
+    eliminar('usuarios',u,'la cuenta "'+(u.nombre||u.correo)+'"',true);
   }
 }
+function eliminarMision(m){
+  if(!m||!esNivelAdmin())return;
+  const n=equipoTodos(m.id).length;
+  if(n)return alert(`Esta misión tiene ${n} ${n===1?'cuenta':'cuentas'}. Primero pasa esas cuentas a otra misión, o elimínalas (desde esta misma pantalla).`);
+  eliminar('misiones',m,'la misión "'+m.nombre+'"');
+}
+
+// ---------- Menú de los 3 puntos (⋮): una mini ventana con Editar y, debajo, Eliminar ----------
+// Sirve para cada cuenta («u:ID») y para cada misión («m:ID»). Solo muestra lo que esa cuenta puede hacer.
+const PUNTOS='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
+let menuAbierto=null;
+function cerrarMenuMas(){if(menuAbierto){menuAbierto.remove();menuAbierto=null}}
+function menuMas(btn,clave){
+  const mismo=menuAbierto&&menuAbierto._btn===btn;
+  cerrarMenuMas();if(mismo)return;
+  const tipo=clave.charAt(0),id=clave.slice(2),actor=sesion();if(!actor)return;
+  const items=[];                                  // [icono, texto, acción, peligro?]
+  if(tipo==='u'){
+    const u=U.find(x=>x.id===id);if(!u)return;
+    if(puedeEditarCuenta(u,actor))items.push(['edt','Editar',()=>formEditar(u)]);
+    if(puedeEliminarCuenta(u,actor))items.push(['trs','Eliminar cuenta',()=>eliminarCuenta(u),true]);
+  }else if(esNivelAdmin()){
+    const m=misionPorId(id);if(!m)return;
+    items.push(['edt','Editar misión',()=>formularioMision(m)],['trs','Eliminar misión',()=>eliminarMision(m),true]);
+  }
+  if(!items.length)return;
+  const menu=document.createElement('div');menu.className='menu-pop';menu.setAttribute('role','menu');menu._btn=btn;
+  menu.innerHTML=items.map(([i,t,,p],k)=>`${p&&k>0?'<hr>':''}<button type="button" role="menuitem" data-k="${k}"${p?' class="peligro"':''}>${ic(i,15)} ${esc(t)}</button>`).join('');
+  menu.style.visibility='hidden';document.body.append(menu);
+  const r=btn.getBoundingClientRect(),w=menu.offsetWidth,h=menu.offsetHeight;
+  menu.style.left=Math.min(Math.max(8,r.right-w),innerWidth-w-8)+'px';
+  menu.style.top=(r.bottom+4+h>innerHeight-8?Math.max(8,r.top-h-4):r.bottom+4)+'px';
+  menu.style.visibility='';
+  menu.onclick=e=>{const o=e.target.closest('button[data-k]');if(!o)return;const it=items[+o.dataset.k];cerrarMenuMas();it[2]()};
+  menuAbierto=menu;
+  const primero=menu.querySelector('button');if(primero)primero.focus();
+}
+document.addEventListener('click',e=>{if(menuAbierto&&!menuAbierto.contains(e.target)&&!e.target.closest('[data-mas]'))cerrarMenuMas()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&menuAbierto){e.stopPropagation();cerrarMenuMas()}},true);
+addEventListener('scroll',cerrarMenuMas,true);
+addEventListener('resize',cerrarMenuMas);
+addEventListener('hashchange',cerrarMenuMas);
 
 // ---------- Formularios (ventanita con campos) ----------
 const ERRORES_AUTH={
@@ -466,7 +546,7 @@ function formNuevo(){
 
 export function formEditar(u){
   if(!u)return;
-  const cambiaNivel=esAdministrador();                          // SOLO el Administrador cambia niveles
+  const cambiaNivel=esNivelAdmin();                             // el Administrador y su Editor cambian niveles (el Editor no puede crear Administradores)
   const cambiaMision=esNivelAdmin();                            // el Administrador y su Editor pasan una cuenta a otra misión (una cuenta de misión no)
   const nivelAct=nivelDe(u);
   const sinMision=!u.misionId||!misionPorId(u.misionId);
@@ -474,7 +554,7 @@ export function formEditar(u){
   const o=modal(`<div class="mh"><h2>Editar cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" value="${esc(u.nombre||'')}" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Correo<input id="fe" value="${esc(u.correo||'')}" disabled></label>
-    ${cambiaNivel?`<label class="fl2" style="margin-bottom:12px">Nivel<select id="fr">${Object.entries(NIVELES).map(([v,t])=>`<option value="${v}" ${v===nivelAct?'selected':''}>${esc(t)}</option>`).join('')}</select></label>`:''}
+    ${cambiaNivel?`<label class="fl2" style="margin-bottom:12px">Nivel<select id="fr">${Object.entries(NIVELES).filter(([v])=>esAdministrador()||v!=='admin').map(([v,t])=>`<option value="${v}" ${v===nivelAct?'selected':''}>${esc(t)}</option>`).join('')}</select></label>`:''}
     ${cambiaMision?`<label class="fl2" id="fmw" style="margin-bottom:12px">Misión<select id="fm">${sinMision?'<option value="">(elige una misión)</option>':''}${listaMisiones().map(m=>`<option value="${m.id}" ${m.id===u.misionId?'selected':''}>${esc(etiquetaMision(m))}</option>`).join('')}</select></label>`:''}
     <p style="margin:0 0 12px;color:var(--gris);font-size:13.5px">La contraseña solo la cambia cada cuenta desde el botón «Mi cuenta» de su propia sesión. El correo no se puede cambiar aquí.</p>
     ${pendiente?`<label class="chk" style="margin:2px 0 14px"><input type="checkbox" id="fv"> Dejarla entrar sin verificar su correo (si quedó bloqueada y no le llega el correo)</label>`:''}
@@ -490,6 +570,7 @@ export function formEditar(u){
     const nombre=$('#fn',o).value.trim(),activo=$('#fa',o).checked,nivel=nivelElegido();
     const cambios={nombre:nombre||u.correo,activo};
     const cambioNivel=nivel!==nivelAct;
+    if(nivel==='admin'&&cambioNivel&&!esAdministrador())return err('Solo un Administrador puede crear otro Administrador.');
     if(cambioNivel){
       if(u.rol==='admin'&&!confirm('«'+(u.nombre||u.correo)+'» dejará de ser Administrador y pasará a «'+NIVELES[nivel]+'». ¿Continuar?'))return;
       Object.assign(cambios,datosDeNivel(nivel));
@@ -526,19 +607,6 @@ function tiempoRelativo(ms){
   const anio=Math.round(mes/12);return `hace ${anio} año${anio===1?'':'s'}`;
 }
 
-// contextoInicio: qué mostrar en el chip de bienvenida y en la tarjeta «Tu misión»/«Espacio».
-function contextoInicio(actor){
-  if(nivelAdminU(actor))return{
-    chip:etiquetaRol(actor)+' · Espacio General',
-    espacioTitulo:'Espacio',
-    espacioSub:'General. Desde el menú de tu cuenta puedes gestionar las cuentas, las misiones y la configuración.'
-  };
-  const m=misionPorId(actor.misionId);
-  const nombreM=m?m.nombre:(actor.misionId?'(misión eliminada)':'Sin misión');
-  const paisM=m&&m.pais?' · '+m.pais:'';
-  return{chip:etiquetaRol(actor)+paisM,espacioTitulo:'Tu misión',espacioSub:nombreM+paisM};
-}
-
 function novedades(){
   const actor=sesion();if(!actor)return [];
   const cuentas=cuentasVisibles(actor).filter(u=>u.id!==actor.id).map(u=>({
@@ -560,7 +628,6 @@ function pintarInicio(){
   if(!elInicio||!elInicio.isConnected)return;
   const actor=sesion();if(!actor)return;
   const wrap=elInicio.querySelector('.inicio');if(!wrap)return;
-  const ctx=contextoInicio(actor);
   const items=novedades();
   const iconoDe=tipo=>tipo==='cancion'?ic('mus',18):ic('usr',18);
   const filaNovedad=it=>{
@@ -569,16 +636,12 @@ function pintarInicio(){
   };
   wrap.innerHTML=`<div class="bienvenida">
       <div><h1>Hola, ${esc(actor.nombre||actor.correo)}</h1><p>${hoyLargo()}</p></div>
-      <span class="chip">${esc(ctx.chip)}</span>
     </div>
     <div class="col2">
       <section class="c2 novedades">
         <div class="nh"><h2>Novedades</h2><small>Lo más reciente</small></div>
         <div class="ulist">${items.map(filaNovedad).join('')||'<p class="vacio">Aún no hay novedades.</p>'}</div>
       </section>
-      <aside class="barra-lateral">
-        <div class="c2 espacio"><div class="eh">${ic('pin',16)}<h3>${esc(ctx.espacioTitulo)}</h3></div><p>${esc(ctx.espacioSub)}</p></div>
-      </aside>
     </div>`;
 }
 const inicioOrig=vistas.inicio;
