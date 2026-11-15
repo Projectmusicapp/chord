@@ -23,6 +23,7 @@ import {$,esc,escuchar,vistas} from "./base.js";
 import {MOM,fechaLarga,cancion,textoHtml,textosDespues,esPeticiones} from "./hoja.js";
 import {textoEquipo,htmlMiembros,alCambiarEquipos} from "./equipos.js";
 import {MAY,MEN,usaSostenidos,tokensAcorde,transponerChars,raizTono,esMenor,nombreTono,ix} from "./musica.js";
+import {svgI as svg} from "./formato.js";
 
 // ---------- 1. ESTILOS ----------
 const st=document.createElement('style');
@@ -133,7 +134,6 @@ function transpuesta(c,d){
 }
 
 // ---------- 4. DIBUJAR ----------
-const svg=(d,s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const medio=d=>{const n=d>6?d-12:d;if(!n)return '';const a=Math.abs(n),t=(a>=2?Math.floor(a/2):'')+(a%2?'½':'');return (n>0?'+':'−')+t};   // 3 semitonos → «+1½»
 
 // Las canciones del repertorio, en orden, cada una con una clave propia (así cada una se transpone por separado)

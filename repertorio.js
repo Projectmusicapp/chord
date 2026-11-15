@@ -1,7 +1,7 @@
 // ===== PANTALLA: REPERTORIO (misa y evento, vista previa y PDF) =====
 import {$,esc,guardar,crear,eliminar,vistas,ic,modal,aviso} from "./base.js";
 import {MOM,MES,fechaLarga,cancion,textosDespues,esPeticiones,lineasTx,lineasTxHtml,fcss,OKC} from "./hoja.js";
-import {FIJAS,PROPOR,colorOk,CT} from "./formato.js";
+import {FIJAS,PROPOR,colorOk,CT,svgI as ico} from "./formato.js";
 import {elegirEscala,textoEquipo,equipoDe,alCambiarEquipos} from "./equipos.js";
 import {E,alCambiar} from "./estado.js";
 
@@ -61,7 +61,6 @@ st.textContent=`[data-vista=repertorio] .rcols{display:grid;grid-template-column
 @page{size:A4;margin:14mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
 document.head.append(st);
 
-const ico=(p,s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 const SHF='<path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>';
 const PRN='<path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v8H6z"/>';
 const EXP='<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>';
@@ -143,7 +142,7 @@ function pizq(){
     <div class="rhead"><label class="fl2">Nombre del repertorio<input id="rn" value="${esc(rep.nombre||'')}"></label>
     <label class="fl2">Fecha<input type="date" id="rf" value="${esc(rep.fecha||'')}"></label>
     <label class="chk" style="margin:2px 0"><input type="checkbox" id="ra" ${rep.acordes?'checked':''}> Mostrar acordes</label></div>`
-    +(rep.tipo==='evento'?`<div class="azesc" style="grid-template-columns:1fr 1fr;margin-top:8px"><button data-sadd>${ic('pls',16)} A\u00f1adir secci\u00f3n</button><button class="sec" data-xnew>${ic('pls',16)} Texto</button></div>${rep.secciones.map(secs).join('')}`:`<div class="azesc" style="grid-template-columns:1fr 1fr auto"><button class="sec" data-alet>${ico(SHF)} Aleatorio</button><button class="sec" data-xnew>${ic('pls',16)} Texto</button><button class="sec besc${textoEquipo(rep.escala)?' elegida':''}" data-mesc title="Elegir escala para toda la misa">${ic('usr',16)}<span>Escala</span></button></div>${textoEquipo(rep.escala)?`<div class="escsec escmisa"><button class="escver" data-escver="m" aria-haspopup="dialog" title="Ver integrantes">${ic('usr',14)}<span>${esc(textoEquipo(rep.escala))}</span></button><button data-mescq aria-label="Quitar escala" title="Quitar escala">${ic('x',13)}</button></div>`:''}<div class="momentos">${MOM.map(fila).join('')}</div>`);
+    +(rep.tipo==='evento'?`<div class="azesc" style="grid-template-columns:1fr 1fr;margin-top:8px"><button data-sadd>${ic('pls',16)} A\u00f1adir secci\u00f3n</button><button class="sec" data-xnew>${ic('pls',16)} Texto</button></div>${rep.secciones.map(secs).join('')}`:`<div class="azesc" style="grid-template-columns:1fr 1fr auto"><button class="sec" data-alet>${ico(SHF,16)} Aleatorio</button><button class="sec" data-xnew>${ic('pls',16)} Texto</button><button class="sec besc${textoEquipo(rep.escala)?' elegida':''}" data-mesc title="Elegir escala para toda la misa">${ic('usr',16)}<span>Escala</span></button></div>${textoEquipo(rep.escala)?`<div class="escsec escmisa"><button class="escver" data-escver="m" aria-haspopup="dialog" title="Ver integrantes">${ic('usr',14)}<span>${esc(textoEquipo(rep.escala))}</span></button><button data-mescq aria-label="Quitar escala" title="Quitar escala">${ic('x',13)}</button></div>`:''}<div class="momentos">${MOM.map(fila).join('')}</div>`);
 }
 // ===================== esto se puede Borrar =====================
 // Muestra el equipo elegido (escala) en la vista previa y en el PDF.
