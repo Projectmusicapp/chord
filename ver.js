@@ -19,7 +19,7 @@
 //   4. DIBUJAR ........... barra de arriba, hoja y panel de tono
 //   5. EVENTOS ........... clics, teclas y zoom con dos dedos
 // =====================================================================
-import {$,esc,escuchar,vistas} from "./base.js";
+import {$,esc,escucharDoc,vistas} from "./base.js";
 import {MOM,fechaLarga,cancion,textoHtml,textosDespues,esPeticiones} from "./hoja.js";
 import {textoEquipo,htmlMiembros,alCambiarEquipos} from "./equipos.js";
 import {MAY,MEN,usaSostenidos,tokensAcorde,transponerChars,raizTono,esMenor,nombreTono,ix} from "./musica.js";
@@ -82,18 +82,45 @@ st.textContent=`.modo-ver header,.modo-ver #nav{display:none!important}
 document.head.append(st);
 
 // ---------- 2. DATOS (solo lectura) ----------
-let R=null,C=null,A=[],el=null,id=null;
+// Quien abre un enlace compartido no tiene sesión ni ámbito propio, así que antes esto escuchaba
+// las colecciones ENTERAS de repertorios/canciones/álbumes solo para mostrar un repertorio puntual
+// (y cualquiera puede abrir un enlace muchas veces, sin login). Ahora solo se pide ese repertorio
+// y las canciones/álbumes que de verdad usa, con un documento suelto por cada uno.
+let R=null,repCargado=false,C={},A={},el=null,id=null,dejarRep=null;
+const suscC=new Map(),suscA=new Map();   // id de documento -> función para dejar de escucharlo
 // Lo que cambia cada persona en su pantalla. Se pierde al recargar (a propósito).
 const local={acordes:null,tonos:{},abierto:null,zoom:1,manual:false};
 let barraOculta=false;
-escuchar('repertorios',l=>{R=l;pintar()});
 alCambiarEquipos(()=>pintar());
-escuchar('canciones',l=>{C=l;pintar()});
-escuchar('albumes',l=>{A=l||[];pintar()});
-const albDe=c=>(A.find(a=>a.id===c.albumId)||{}).nombre||'';   // nombre del álbum de una canción
+
+// idsCancionesDe(r): los ids de canciones que de verdad usa este repertorio (sin repetir).
+function idsCancionesDe(r){
+  if(!r)return [];
+  if(r.tipo==='lista')return [...new Set((r.canciones||[]).filter(Boolean))];
+  if(r.tipo==='evento')return [...new Set((r.secciones||[]).flatMap(s=>s.canciones||[]).filter(Boolean))];
+  return [...new Set(Object.values(r.misa||{}).filter(Boolean))];
+}
+// sincroniza: deja de escuchar los documentos que ya no hacen falta y empieza a escuchar los
+// nuevos, así solo hay un listener por documento que la pantalla realmente está usando.
+function sincroniza(mapa,susc,ids,col,alCambiar){
+  const activos=new Set(ids);
+  for(const [i,dejar] of [...susc])if(!activos.has(i)){dejar();susc.delete(i);delete mapa[i]}
+  activos.forEach(i=>{if(!susc.has(i))susc.set(i,escucharDoc(col,i,d=>{if(d)mapa[i]=d;else delete mapa[i];alCambiar();pintar()}))});
+  alCambiar();   // por si la lista cambió sin añadir ningún documento nuevo (p.ej. se quitó una canción)
+}
+function sincronizaCanciones(){sincroniza(C,suscC,idsCancionesDe(R),'canciones',sincronizaAlbumes)}
+function sincronizaAlbumes(){sincroniza(A,suscA,[...new Set(Object.values(C).map(c=>c.albumId).filter(Boolean))],'albumes',()=>{})}
+const albDe=c=>(A[c.albumId]||{}).nombre||'';   // nombre del álbum de una canción
 
 vistas.ver=(e,rid)=>{
-  if(id!==rid){id=rid;local.acordes=null;local.tonos={};local.abierto=null;local.zoom=1;local.manual=false}
+  if(id!==rid){
+    id=rid;local.acordes=null;local.tonos={};local.abierto=null;local.zoom=1;local.manual=false;
+    if(dejarRep)dejarRep();
+    R=null;repCargado=false;C={};A={};
+    suscC.forEach(dejar=>dejar());suscC.clear();
+    suscA.forEach(dejar=>dejar());suscA.clear();
+    dejarRep=escucharDoc('repertorios',rid,r=>{R=r;repCargado=true;sincronizaCanciones();pintar()});
+  }
   el=e;el.onclick=clic;el.onkeydown=tecla;
   pintar();
 };
@@ -174,8 +201,8 @@ function panelEquipo(b){
 
 function pintar(){
   if(!el)return;
-  if(!R||!C){el.innerHTML='<div class="vmsg"><p>Cargando repertorio…</p></div>';return}
-  const r=R.find(x=>x.id===id);
+  if(!repCargado){el.innerHTML='<div class="vmsg"><p>Cargando repertorio…</p></div>';return}
+  const r=R;
   if(!r){document.title='Repertorio no encontrado';el.innerHTML='<div class="vmsg"><h1>No encontramos este repertorio</h1><p>Puede que lo hayan eliminado o que el enlace esté incompleto. Pide a quien te lo envió que lo comparta otra vez.</p></div>';return}
   document.title=(r.nombre||'Repertorio')+(r.fecha?' · '+fechaLarga(r.fecha):'');
   if(local.acordes===null)local.acordes=!!r.acordes;
@@ -183,7 +210,7 @@ function pintar(){
   const hoja=bloques(r).map(b=>{
     if(b.tx)return `<div class="blk">${b.titulo?`<div class="lab">${esc(b.titulo)}</div>`:''}${textoHtml(b.t)}</div>`;   // texto escrito a mano
     const canciones=b.items.map(({clave,cid})=>{
-      const c0=C.find(x=>x.id===cid);if(!c0)return '';
+      const c0=C[cid];if(!c0)return '';
       const d=local.tonos[clave]||0,c=transpuesta(c0,d),abierto=local.abierto===clave;
       const tono=t=>!transponible(c0)?'':`<span class="tdd"><button class="tono-b" data-tono="${clave}" aria-expanded="${abierto}" aria-label="Cambiar tono de ${esc(c0.titulo)}${t?', ahora '+esc(t):''}">${t?`Tono: ${esc(t)}`:'Tono'}${d?` <span class="dif">${medio(d)}</span>`:''} ${svg('<path d="M6 9l6 6 6-6"/>',13)}</button></span>`;
       return cancion(c,ac,{tono,album:b.sin?'':albDe(c0)});
@@ -193,7 +220,7 @@ function pintar(){
   let cuadro='';   // el cuadro abierto (tono o escala), fuera de la hoja para que el zoom no lo afecte
   if(local.abierto){
     if(local.abierto.startsWith('eq:')){const b=bloques(r).find(x=>'eq:'+x.id===local.abierto);if(b)cuadro=panelEquipo(b)}
-    else{const c0=C.find(x=>x.id===local.abierto.split(':').pop());if(c0)cuadro=panel(c0,local.abierto)}
+    else{const c0=C[local.abierto.split(':').pop()];if(c0)cuadro=panel(c0,local.abierto)}
   }
   el.innerHTML=`<div class="vbar${barraOculta?' oculta':''}"><div class="vt2"><h1>${esc(r.nombre||'Repertorio')}</h1>${r.fecha?`<small>${esc(fechaLarga(r.fecha))}</small>`:''}</div>
       <button class="vac2" data-acordes aria-pressed="${ac}"><span class="vchk2">${ac?svg('<path d="M20 6L9 17l-5-5"/>',12):''}</span>Acordes</button></div>
@@ -209,7 +236,7 @@ function clic(e){
   const b=e.target.closest('button');
   if(!b){if(local.abierto&&!e.target.closest('.tpan')){local.abierto=null;pintar()}return}
   if(b.dataset.eqb){const k=b.dataset.eqb;local.abierto=local.abierto===k?null:k;return repinta(`[data-eqb="${k}"]`)}
-  const d=b.dataset,c=k=>C.find(x=>x.id===k.split(':').pop());
+  const d=b.dataset,c=k=>C[k.split(':').pop()];
     if(d.acordes!=null){local.acordes=!local.acordes;local.manual=false;local.abierto=null;return repinta('[data-acordes]')}
   if(d.tono){local.abierto=local.abierto===d.tono?null:d.tono;return repinta(`[data-tono="${d.tono}"]`)}
   if(d.cerrar!=null){const k=local.abierto;local.abierto=null;return repinta(botonDe(k))}
