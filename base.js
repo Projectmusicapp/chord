@@ -26,7 +26,7 @@ export const escucharDoc=(col,id,fn)=>onSnapshot(doc(db,col,id),s=>fn(s.exists()
 // ===== AUTENTICACIÓN (Firebase Authentication: correo + contraseña) =====
 export const alCambiarAuth=fn=>onAuthStateChanged(auth,fn);
 export const iniciarSesionAuth=(correo,clave)=>signInWithEmailAndPassword(auth,correo,clave);
-export const cerrarSesionAuth=()=>signOut(auth);
+export const cerrarSesionAuth=()=>{olvidarEspacio();return signOut(auth)};
 export const enviarVerificacion=user=>sendEmailVerification(user);
 export const cambiarMiClave=(user,clave)=>updatePassword(user,clave);
 export const recargarUsuarioAuth=user=>reload(user);
@@ -50,42 +50,102 @@ export async function crearCuentaComoAdmin(correo,clave){
 
 // ===== SESIÓN (quién usa la app ahora mismo) =====
 // La arma login.js (con establecerSesion) combinando la cuenta de Firebase Authentication
-// con su documento en Firestore (rol, misionId, nombre...).
+// con su documento en Firestore (roles, nombre...).
 //
-// Roles: admin · editor · mision · usuario
-//  - «editor» siempre trae editorDe: 'admin' (Editor del administrador: mismo poder que el
-//    Administrador, trabaja en el espacio general) o 'mision' (Editor de misión: mismo poder
-//    que una cuenta Misión, trabaja en SU misión, guardada en misionId).
-//  - Si un editor no trae editorDe, se trata como Editor de misión (lo más restringido).
-let usuarioActual=null;
-export const sesion=()=>usuarioActual;
-export function establecerSesion(u){usuarioActual=u;dispatchEvent(new Event('ambitocambio'))}
-export const esEditorAdmin=u=>!!u&&u.rol==='editor'&&u.editorDe==='admin';
-export const esEditorMision=u=>!!u&&u.rol==='editor'&&u.editorDe!=='admin';
-// esNivelAdmin: poder de Administrador (el Administrador y su Editor).
-export const esNivelAdmin=()=>{const u=usuarioActual;return !!u&&(u.rol==='admin'||esEditorAdmin(u))};
-// esAdministrador: SOLO las cuentas «Administrador» (no su Editor). Cambiar niveles es solo de ellas.
-export const esAdministrador=()=>{const u=usuarioActual;return !!u&&u.rol==='admin'};
-// puedeEditar: todos los roles pueden crear/editar algo EXCEPTO «usuario» (solo ve).
-export const puedeEditar=()=>{const u=usuarioActual;return !!u&&u.rol!=='usuario'};
+// NIVELES (un nivel = un rol dentro de UN espacio):
+//   admin · editor-admin ........ espacio GENERAL (el del Administrador)
+//   mision · editor-mision · usuario ... espacio de UNA misión (misionId)
+//
+// UNA CUENTA PUEDE TENER VARIOS ROLES a la vez, pero como máximo uno por espacio:
+//   usuarios/{uid}.roles = [{nivel:'editor-admin',misionId:null},{nivel:'editor-mision',misionId:'sanjose'}]
+//   usuarios/{uid}.espacios = ['general','sanjose']      (lista auxiliar, se rellena sola)
+// Las cuentas antiguas (sin «roles») se leen de sus campos de siempre: rol · editorDe · misionId
+// (rolesDe() los convierte), así que no hace falta migrar nada. Al guardar roles, esos tres campos
+// se siguen escribiendo con el rol de mayor nivel (compatibilidad con lo que ya existía).
+//
+// ESPACIO ACTIVO: la persona trabaja en UN espacio a la vez (el que elige en la cabecera). Todos los
+// permisos de abajo (puedeEditar, esNivelAdmin...) se calculan con SU ROL EN ESE ESPACIO, nunca con la
+// suma de todos sus roles: así un rol no da permisos en otro espacio.
+export const GENERAL='general';
+const PRIORIDAD={admin:5,'editor-admin':4,mision:3,'editor-mision':2,usuario:1};
+export const esNivelGeneral=n=>n==='admin'||n==='editor-admin';
+export const DATOS_NIVEL={admin:{rol:'admin',editorDe:null},'editor-admin':{rol:'editor',editorDe:'admin'},'editor-mision':{rol:'editor',editorDe:'mision'},mision:{rol:'mision',editorDe:null},usuario:{rol:'usuario',editorDe:null}};
+const nivelDeCampos=u=>u.rol==='editor'?(u.editorDe==='admin'?'editor-admin':'editor-mision'):(PRIORIDAD[u.rol]?u.rol:'usuario');
+// rolesDe: los roles de una cuenta [{nivel,misionId}] (misionId null en el espacio general).
+export function rolesDe(u){
+  if(!u)return [];
+  if(Array.isArray(u.roles))return u.roles.filter(r=>r&&PRIORIDAD[r.nivel]).map(r=>({nivel:r.nivel,misionId:esNivelGeneral(r.nivel)?null:(r.misionId||'sin-mision')}));
+  const n=nivelDeCampos(u);                                   // cuenta antigua: un solo rol
+  return [{nivel:n,misionId:esNivelGeneral(n)?null:(u.misionId||'sin-mision')}];
+}
+// espaciosDe: los espacios de una cuenta [{id,nivel}]; id = 'general' o el id de la misión. El general va primero.
+export function espaciosDe(u){
+  const m=new Map();
+  rolesDe(u).forEach(r=>{const id=esNivelGeneral(r.nivel)?GENERAL:r.misionId;const a=m.get(id);if(!a||PRIORIDAD[r.nivel]>PRIORIDAD[a])m.set(id,r.nivel)});
+  return [...m].map(([id,nivel])=>({id,nivel})).sort((a,b)=>(a.id===GENERAL?0:1)-(b.id===GENERAL?0:1));
+}
+export const nivelEn=(u,espacio)=>{const e=espaciosDe(u).find(x=>x.id===espacio);return e?e.nivel:null};
+// camposDeRoles: lo que se guarda en la cuenta para una lista de roles (un rol por espacio).
+export function camposDeRoles(roles){
+  const lista=[...roles].sort((a,b)=>PRIORIDAD[b.nivel]-PRIORIDAD[a.nivel]).map(r=>({nivel:r.nivel,misionId:esNivelGeneral(r.nivel)?null:r.misionId}));
+  const p=lista[0];
+  return {roles:lista,espacios:[...new Set(lista.map(r=>esNivelGeneral(r.nivel)?GENERAL:r.misionId))],...DATOS_NIVEL[p.nivel],misionId:p.misionId};
+}
 
-// ===== ÁMBITO: el «espacio» de una misión (su propio calendario, escalas, canciones...) =====
-// null = el espacio general/base (el del Administrador y su Editor, que siempre trabajan ahí).
-// Las cuentas Misión, Editor de misión y Usuario trabajan en el espacio de SU misión: su campo
-// misionId guarda el id de la misión (se crean en la pantalla Misiones).
+let usuarioActual=null,espacioId=null;
+export const sesion=()=>usuarioActual;
+const claveEspacio=u=>'espacio-activo:'+u.id;
+function olvidarEspacio(){try{if(usuarioActual)sessionStorage.removeItem(claveEspacio(usuarioActual))}catch(e){}}
+export function establecerSesion(u){
+  const antes=espacioId;
+  usuarioActual=u;
+  if(u){
+    const lista=espaciosDe(u);
+    let id=espacioId;
+    if(!id){try{id=sessionStorage.getItem(claveEspacio(u))}catch(e){}}
+    if(!lista.some(e=>e.id===id))id=lista.length?lista[0].id:null;   // al entrar: el general si lo tiene; si no, su primera misión
+    espacioId=id;
+    try{if(id)sessionStorage.setItem(claveEspacio(u),id)}catch(e){}
+    if(antes&&antes!==id){                                    // le quitaron el espacio en el que estaba: vuelve al Inicio ya en otro
+      location.hash='inicio';setTimeout(()=>location.reload(),300);
+    }
+  }else espacioId=null;
+  dispatchEvent(new Event('ambitocambio'));
+}
+// espacioActual: 'general', el id de una misión, o null (cuenta sin ningún espacio).
+export const espacioActual=()=>espacioId;
+export const nivelActivo=()=>usuarioActual&&espacioId?nivelEn(usuarioActual,espacioId):null;
+// cambiarEspacio: guarda lo pendiente (las pantallas lo hacen al cambiar la dirección) y recarga en el Inicio,
+// así no queda nada del otro espacio en pantalla ni en memoria.
+export function cambiarEspacio(id){
+  const u=usuarioActual;
+  if(!u||id===espacioId||!espaciosDe(u).some(e=>e.id===id))return;
+  try{sessionStorage.setItem(claveEspacio(u),id)}catch(e){}
+  location.hash='inicio';
+  setTimeout(()=>location.reload(),400);
+}
+// esNivelAdmin: poder de Administrador en el espacio activo (Administrador o su Editor, solo en el general).
+export const esNivelAdmin=()=>{const n=nivelActivo();return n==='admin'||n==='editor-admin'};
+// esAdministrador: SOLO el nivel «Administrador» (no su Editor) en el espacio activo.
+export const esAdministrador=()=>nivelActivo()==='admin';
+// puedeEditar: en el espacio activo, todos los niveles pueden crear/editar algo EXCEPTO «usuario» (solo ve).
+export const puedeEditar=()=>{const n=nivelActivo();return !!n&&n!=='usuario'};
+
+// ===== ÁMBITO: el «espacio» donde se trabaja ahora (su propio calendario, escalas, canciones...) =====
+// null = el espacio general/base (el del Administrador y su Editor). Si no, el id de la misión activa.
 export function ambitoActual(){
   const u=usuarioActual;if(!u)return null;
-  if(u.rol==='admin'||esEditorAdmin(u))return null;
-  return u.misionId||'sin-mision';           // una cuenta sin misión no ve nada ni toca el espacio general
+  if(espacioId===GENERAL)return null;
+  return espacioId||'sin-mision';             // una cuenta sin ningún espacio no ve nada ni toca el general
 }
 const propioAmbito=d=>(d.misionId||null)===ambitoActual();
 // visibleBiblioteca: un álbum sin misionId es de la biblioteca general (de todos),
 // salvo que esté oculto (solo lo ve el nivel Administrador). Un álbum con misionId
-// es privado de esa misión: solo lo ve esa misión (o el Administrador revisándolo).
+// es privado de esa misión: solo se ve estando en el espacio de esa misión.
 export const visibleBiblioteca=a=>{const mid=a.misionId||null;return mid===null?(esNivelAdmin()||!a.oculto):mid===ambitoActual()};
 // ¿se puede editar este álbum (o mover una canción hacia él)? Uno «general» (sin misionId)
-// solo lo edita el nivel Administrador; uno privado de una misión lo edita esa misión
-// (o quien lo esté revisando con el selector de espacio de trabajo).
+// solo lo edita el nivel Administrador (en el espacio general); uno privado de una misión lo edita
+// quien tenga permiso de edición en esa misión.
 export const puedeEditarAlbum=alb=>!alb?false:(alb.misionId?(puedeEditar()&&alb.misionId===ambitoActual()):esNivelAdmin());
 
 // Colecciones que pertenecen a una misión: se guardan con el misionId del ámbito
@@ -93,6 +153,7 @@ export const puedeEditarAlbum=alb=>!alb?false:(alb.misionId?(puedeEditar()&&alb.
 const COL_AMBITO=new Set(['eventos','dias','escalas','personas','repertorios','albumes']);
 function conAmbito(col,d){
   if(!COL_AMBITO.has(col))return d;
+  if(d.misionId)return d;                     // ya tiene dueño (una misión): se respeta, nunca se pasa a otro espacio
   const amb=ambitoActual();
   return amb?{...d,misionId:amb}:d;
 }
@@ -184,7 +245,7 @@ const menuDe=()=>[['calendario','cal','Calendario','Eventos y ensayos'],['repert
 // Esas cuentas solo ven «Mi lista» y «Canciones» en la barra (Inicio sigue en el logo),
 // y no pueden abrir Calendario, Repertorio ni Escalas aunque escriban la dirección.
 const menuUsuario=[['milista','mus','Mi lista','Tus listas de canciones'],['canciones','dsc','Canciones','Letras y acordes']];
-const esSoloVer=()=>!!usuarioActual&&usuarioActual.rol==='usuario';
+const esSoloVer=()=>nivelActivo()==='usuario';
 const BLOQUEADAS_SOLO_VER=['calendario','repertorio','escalas'];
 // ===== FIN CHIGO =====
 const vista=()=>location.hash.slice(1)||'inicio';

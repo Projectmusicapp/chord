@@ -1,5 +1,5 @@
 // =====================================================================
-//  USUARIOS.JS  ·  Cuentas y permisos (4 niveles, con misiones)
+//  USUARIOS.JS  ·  Cuentas y permisos (niveles, misiones y VARIOS ROLES por cuenta)
 //
 //  Las cuentas usan Firebase Authentication (correo + contraseña, ver
 //  base.js): el id de cada cuenta aquí es el uid que le da Firebase Auth,
@@ -29,6 +29,11 @@
 //                login.js): esas cuentas quedan con requiereVerificacion = true
 //                hasta que confirman su correo.
 //
+//  VARIOS ROLES: una misma cuenta puede tener un rol en el espacio general y/o en
+//  una o más misiones (uno por espacio), guardados en «roles» (ver base.js). La persona
+//  elige en la cabecera en qué espacio trabaja, y cada permiso se calcula con SU rol en
+//  ese espacio. Solo el Administrador asigna varios roles a una cuenta (ver formEditar).
+//
 //  Las misiones las crea el Administrador (o su Editor) en la pantalla
 //  «Misiones» (ver misiones.js). Cada cuenta de misión guarda en «misionId» el
 //  id de su misión, y los datos de cada misión (álbumes propios, calendario,
@@ -38,7 +43,7 @@
 //  Una cuenta creada desde «Nueva cuenta» queda con requiereVerificacion:false:
 //  se confía en quien la dio de alta. Solo el autorregistro exige verificar.
 // =====================================================================
-import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,esAdministrador,esEditorAdmin,esEditorMision,puedeEditar,configActual,hoyLargo,auth,cambiarMiClave,crearCuentaAuth,crearCuentaComoAdmin,enviarVerificacion,definirApariencia,refrescarCabecera,recargarUsuarioAuth} from "./base.js";
+import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,esAdministrador,puedeEditar,configActual,hoyLargo,auth,cambiarMiClave,crearCuentaAuth,crearCuentaComoAdmin,enviarVerificacion,definirApariencia,refrescarCabecera,recargarUsuarioAuth,GENERAL,esNivelGeneral,rolesDe,espaciosDe,nivelEn,camposDeRoles,nivelActivo,espacioActual,ambitoActual,cambiarEspacio} from "./base.js";
 import {ventana as abrirRespaldo} from "./respaldo.js";
 import {E,alCambiar} from "./estado.js";
 import {misionesCargadas,alCambiarMisiones,listaMisiones,misionPorId,etiquetaMision,PAISES,alfa,selectorBandera,activarSelectores,banderaHtml} from "./misiones.js";
@@ -46,13 +51,6 @@ const NOMBRE_PAIS=Object.fromEntries(PAISES);
 
 // NIVELES: los 5 «niveles» que se pueden elegir (el Editor tiene dos variantes).
 const NIVELES={admin:'Administrador','editor-admin':'Editor del administrador','editor-mision':'Editor de misión',mision:'Misión',usuario:'Usuario'};
-const nivelDe=u=>u.rol==='editor'?(u.editorDe==='admin'?'editor-admin':'editor-mision'):(u.rol||'usuario');
-const etiquetaRol=u=>NIVELES[nivelDe(u)]||u.rol;
-// Etiqueta corta del nivel según dónde se muestre. Misión y Usuario no llevan etiqueta.
-const etiquetaCorta=(u,ctx)=>{const n=nivelDe(u);if(n==='admin')return 'Administrador';if(n==='editor-admin')return 'Editor';if(n==='editor-mision')return ctx==='roster'?'Editor de misión':'Editor';return ''};
-const necesitaMision=n=>n!=='admin'&&n!=='editor-admin';        // estos dos trabajan en el espacio general
-// datosDeNivel: los campos que se guardan en la cuenta para cada nivel
-const datosDeNivel=n=>({admin:{rol:'admin',editorDe:null},'editor-admin':{rol:'editor',editorDe:'admin'},'editor-mision':{rol:'editor',editorDe:'mision'},mision:{rol:'mision',editorDe:null},usuario:{rol:'usuario',editorDe:null}})[n];
 
 const st=document.createElement('style');
 st.textContent=`header .menu-usuario{position:relative;margin-left:auto}
@@ -61,6 +59,18 @@ header .btn-usuario .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowra
 .av{width:28px;height:28px;border-radius:50%;object-fit:cover;flex:none;display:inline-grid;place-items:center;background:var(--oro);color:var(--azul);font-weight:800;line-height:1}
 header .avw{display:inline-flex;flex:none}
 header .btn-usuario:hover{background:#ffffff26;filter:none}
+header .menu-espacio{position:relative;margin-left:auto}
+header .menu-espacio[hidden]{display:none}
+header .menu-espacio+.menu-usuario{margin-left:8px}
+header .btn-espacio{background:#ffffff14;color:#DDE3F5;min-height:36px;padding:6px 10px;font-size:14px;flex:none;display:inline-flex;align-items:center;gap:6px;max-width:150px}
+header .btn-espacio .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:92px}
+header .btn-espacio:hover{background:#ffffff26;filter:none}
+header .dd-usuario .esp{display:flex;align-items:center;gap:8px;width:100%}
+header .dd-usuario .esp small{margin-left:auto;color:var(--gris);font-weight:500;white-space:nowrap}
+header .dd-usuario .esp[aria-current=true]{background:var(--oro-claro);color:var(--azul);font-weight:800}
+.rfila{display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;flex-wrap:wrap}
+.rfila .fl2{margin:0;flex:1 1 150px;min-width:0}
+.rfila .ic{flex:none}
 header .dd-usuario{position:absolute;right:0;top:100%;margin-top:6px;z-index:12;background:var(--blanco);border:1px solid var(--linea);border-radius:14px;box-shadow:var(--sombra-2);padding:8px;min-width:200px;max-width:min(280px,calc(100vw - 24px));display:grid;gap:2px}
 header .dd-usuario .nombre{padding:8px 10px 10px;font-weight:700;color:var(--tx);border-bottom:1px solid var(--linea);margin-bottom:4px;display:flex;align-items:center;gap:10px;min-width:0}
 header .dd-usuario .nombre .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
@@ -128,7 +138,7 @@ header .dd-usuario button:hover{background:var(--capa);filter:none}
 .menu-pop hr{border:0;border-top:1px solid var(--linea);margin:4px 0;width:100%}`;
 document.head.append(st);
 
-let U=[],listo=false,el=null;
+let U=[],listo=false,el=null,pintarEspaciosFn=null;
 const esperando=[];
 const usuariosCargados=()=>listo?Promise.resolve():new Promise(r=>esperando.push(r));
 export const cargado=()=>Promise.all([usuariosCargados(),misionesCargadas()]).then(()=>{});   // esperan las cuentas y las misiones
@@ -140,25 +150,38 @@ escuchar('usuarios',l=>{
   if(el)pintar();
   pintarInicio();
 });
-alCambiarMisiones(()=>{if(el)pintar();pintarInicio();refrescarCabecera()});   // si cambian las misiones, se vuelven a dibujar los nombres
+alCambiarMisiones(()=>{if(el)pintar();pintarInicio();refrescarCabecera();if(pintarEspaciosFn)pintarEspaciosFn()});   // si cambian las misiones, se vuelven a dibujar los nombres
 
-// ---------- A qué misión pertenecen las cuentas ----------
-// miMision: la misión de esta cuenta (su «misionId»). El Administrador y su Editor no tienen (null: trabajan en el espacio general).
-const nivelAdminU=u=>u.rol==='admin'||esEditorAdmin(u);          // cuentas con poder de Administrador (él y su Editor)
-const miMision=u=>nivelAdminU(u)?null:(u.misionId||null);
+// ---------- A qué espacios pertenecen las cuentas ----------
+// Una cuenta puede tener roles en el espacio general y/o en varias misiones (ver rolesDe en base.js).
+const esAdminU=u=>rolesDe(u).some(r=>r.nivel==='admin');                     // tiene el nivel Administrador
+const nivelAdminU=u=>rolesDe(u).some(r=>esNivelGeneral(r.nivel));            // tiene algún rol en el espacio general (Administrador o su Editor)
+const enMision=(u,id)=>nivelEn(u,id)!==null;                                  // tiene un rol en esa misión
+const soloEnMision=(u,id)=>{const e=espaciosDe(u);return e.length>0&&e.every(x=>x.id===id)};   // y en ningún otro espacio
+// miMision: la misión en la que se está trabajando ahora (null si se está en el espacio general).
+const miMision=()=>{const e=espacioActual();return e&&e!==GENERAL?e:null};
 // misionesDisponibles: para el selector de misión del autorregistro (ver login.js). Ya vienen ordenadas por país.
 export function misionesDisponibles(){
   return listaMisiones().map(m=>({id:m.id,nombre:m.nombre,pais:m.pais||'',codigo:m.codigo||''}));
 }
-// misionDe: el texto de la misión de una cuenta, para mostrarlo en pantalla.
-function misionDe(u){
-  if(nivelAdminU(u))return '';
-  if(!u.misionId)return 'Sin misión';
-  const m=misionPorId(u.misionId);
-  return m?etiquetaMision(m):'(misión eliminada)';
+// nombreEspacio: el nombre corto de un espacio, para la cabecera y el selector.
+function nombreEspacio(id){
+  if(id===GENERAL)return 'General';
+  if(id==='sin-mision')return 'Sin misión';
+  const m=misionPorId(id);return m?m.nombre:'(misión eliminada)';
 }
-// Botón de inicio (logo y nombre): las cuentas de una misión ven el de SU misión (si lo cambió); el resto, el general.
-definirApariencia(()=>{const a=sesion();if(!a||nivelAdminU(a))return null;const m=misionPorId(a.misionId);if(!m)return null;const r={};if(m.logo)r.logo=m.logo;if(m.nombreApp)r.nombre=m.nombreApp;return r});
+// descripcionRoles: los roles de una cuenta en texto («Editor de misión · San José · Perú»). Quien está en el
+// espacio general los ve todos; quien está en una misión solo ve los roles de ESA misión.
+function descripcionRoles(u){
+  const todo=esNivelAdmin(),mid=miMision();
+  return rolesDe(u).filter(r=>todo||(!esNivelGeneral(r.nivel)&&r.misionId===mid)).map(r=>{
+    if(esNivelGeneral(r.nivel))return NIVELES[r.nivel];
+    const m=misionPorId(r.misionId);
+    return NIVELES[r.nivel]+' · '+(r.misionId==='sin-mision'?'Sin misión':m?etiquetaMision(m):'(misión eliminada)');
+  }).join(' / ');
+}
+// Botón de inicio (logo y nombre): en una misión se ve el de ESA misión (si lo cambió); en el espacio general, el general.
+definirApariencia(()=>{const a=sesion();if(!a)return null;const id=ambitoActual();if(!id)return null;const m=misionPorId(id);if(!m)return null;const r={};if(m.logo)r.logo=m.logo;if(m.nombreApp)r.nombre=m.nombreApp;return r});
 addEventListener('ambitocambio',refrescarCabecera);
 
 // ---------- Primera cuenta / autorregistro (los llama login.js) ----------
@@ -174,38 +197,42 @@ export async function autorregistrar(nombre,correo,clave,misionId){
   return cred.user;
 }
 
-// rolesCreables: los niveles que puede crear cada tipo de cuenta
-function rolesCreables(actor){
-  const n=k=>[k,NIVELES[k]];
-  if(actor.rol==='admin')return ['admin','editor-admin','editor-mision','mision','usuario'].map(n);
-  if(esEditorAdmin(actor))return ['editor-admin','editor-mision','mision','usuario'].map(n);   // no crea Administradores
-  if(actor.rol==='mision')return [['editor-mision','Editor'],['usuario','Usuario']];
-  if(esEditorMision(actor))return [['editor-mision','Editor'],['usuario','Usuario']];   // no crea cuentas Misión
+// rolesCreables: los niveles que puede crear quien está trabajando ahora (según su nivel en el espacio activo)
+function rolesCreables(){
+  const n=k=>[k,NIVELES[k]],nivel=nivelActivo();
+  if(nivel==='admin')return ['admin','editor-admin','editor-mision','mision','usuario'].map(n);
+  if(nivel==='editor-admin')return ['editor-admin','editor-mision','mision','usuario'].map(n);   // no crea Administradores
+  if(nivel==='mision'||nivel==='editor-mision')return [['editor-mision','Editor'],['usuario','Usuario']];   // no crea cuentas Misión (ni Administradores)
   return [];
 }
-// cuentasVisibles: el Administrador y su Editor ven aquí solo las cuentas del espacio general
-// (Administrador/Editor del administrador) — las cuentas de cada misión se gestionan desde su
-// propia tarjeta en la pantalla «Misiones», no mezcladas en esta lista (ver misiones.js).
+// cuentasVisibles: en el espacio general, las cuentas que tienen algún rol general (las de cada misión
+// se gestionan desde su propia tarjeta en «Misiones»). En una misión, las cuentas que tienen un rol en ESA misión.
 function cuentasVisibles(actor){
-  if(nivelAdminU(actor))return U.filter(nivelAdminU);
-  const mision=miMision(actor);                  // una misión nunca ve cuentas de otras misiones ni de Administradores
-  return mision?U.filter(u=>u.misionId===mision&&!nivelAdminU(u)):[];
+  if(esNivelAdmin())return U.filter(nivelAdminU);
+  const mision=miMision();                      // una misión nunca ve cuentas de otras misiones
+  return mision?U.filter(u=>enMision(u,mision)):[];
 }
 // puedeEditarCuenta: ¿se muestra el botón «Editar» de esta cuenta?
 function puedeEditarCuenta(u,actor){
-  if(u.id===actor.id)return false;              // su propia cuenta no se gestiona desde aquí (usa «Mi cuenta»)
-  if(actor.rol==='admin')return true;
-  if(esEditorAdmin(actor))return u.rol!=='admin';   // el Editor del administrador no edita a los Administradores
-  const mision=miMision(actor);
-  if(!mision||u.misionId!==mision||nivelAdminU(u))return false;
-  if(actor.rol==='mision')return true;
-  return u.rol!=='mision';                       // el Editor de misión no edita a las cuentas Misión
+  const n=nivelActivo();
+  if(n==='admin')return true;                   // también la suya: así el Administrador elige libremente sus propias misiones
+  if(u.id===actor.id)return false;              // las demás cuentas usan «Mi cuenta» para lo suyo
+  if(n==='editor-admin')return !esAdminU(u);    // el Editor del administrador no edita a los Administradores
+  const mision=miMision();
+  // una cuenta con roles en otros espacios (p. ej. también en el general) la gestiona solo el Administrador:
+  // así nadie puede desactivar ni cambiar a una persona por un rol que tiene en otro lado
+  if(!mision||!soloEnMision(u,mision))return false;
+  if(n==='mision')return true;
+  if(n==='editor-mision')return nivelEn(u,mision)!=='mision';   // el Editor de misión no edita a las cuentas Misión
+  return false;
 }
-// puedeEliminarCuenta: ¿se muestra el botón de eliminar? Ningún Editor elimina a otro Editor.
+// puedeEliminarCuenta: ¿se muestra el botón de eliminar? Nunca la propia; y ningún Editor elimina a otro Editor.
 function puedeEliminarCuenta(u,actor){
+  if(u.id===actor.id)return false;
   if(!puedeEditarCuenta(u,actor))return false;
-  if(actor.rol==='admin'||actor.rol==='mision')return true;
-  return u.rol!=='editor';
+  const n=nivelActivo();
+  if(n==='admin'||n==='mision')return true;
+  return !rolesDe(u).some(r=>r.nivel==='editor-admin'||r.nivel==='editor-mision');
 }
 
 // avatar: foto de perfil redonda; si no hay foto, la inicial del nombre.
@@ -242,14 +269,42 @@ export function montarMenuUsuario(salir){
   const cfgBtn=cont.querySelector('[data-cfg]');if(cfgBtn)cfgBtn.onclick=()=>{cerrar();location.hash='usuarios'};
   cont.querySelector('[data-sal]').onclick=()=>{cerrar();salir()};
   header.append(cont);
+  montarEspacios(header,cont);
 }
+
+// ---------- Espacio de trabajo: botón en la cabecera (solo si la cuenta tiene más de un espacio) ----------
+// Muestra en qué espacio se está trabajando (General o el nombre de la misión) y deja cambiar a otro.
+// Todo lo que se crea o se edita va al espacio activo; al cambiar, se vuelve al Inicio del otro espacio.
+function montarEspacios(header,antes){
+  if(header.querySelector('.menu-espacio'))return;
+  const c=document.createElement('div');c.className='menu-espacio';c.hidden=true;
+  header.insertBefore(c,antes);
+  const cerrar=()=>{const d=c.querySelector('.dd-usuario'),b=c.querySelector('.btn-espacio');if(d)d.hidden=true;if(b)b.setAttribute('aria-expanded','false')};
+  c.onclick=e=>{
+    const op=e.target.closest('[data-esp]');
+    if(op){cerrar();cambiarEspacio(op.dataset.esp);return}
+    const b=e.target.closest('.btn-espacio');
+    if(b){const d=c.querySelector('.dd-usuario'),abrir=d.hidden;d.hidden=!abrir;b.setAttribute('aria-expanded',String(abrir))}
+  };
+  document.addEventListener('click',e=>{if(!c.contains(e.target))cerrar()});
+  pintarEspaciosFn=()=>{
+    const actor=sesion(),lista=actor?espaciosDe(actor):[];
+    c.hidden=lista.length<2;                                         // con un solo espacio no hay nada que elegir
+    if(c.hidden){c.innerHTML='';return}
+    const act=espacioActual();
+    c.innerHTML=`<button type="button" class="btn-espacio" aria-haspopup="true" aria-expanded="false" title="Espacio de trabajo: ${esc(nombreEspacio(act))}">${ic('pin',16)}<span class="nm">${esc(nombreEspacio(act))}</span> &#9662;</button>
+      <div class="dd-usuario" hidden><div class="nombre"><span class="nm">Espacio de trabajo</span></div>${lista.map(e=>`<button type="button" class="esp" data-esp="${esc(e.id)}" aria-current="${e.id===act}">${e.id===act?'✓ ':''}<span>${esc(nombreEspacio(e.id))}</span><small>${esc(NIVELES[e.nivel])}</small></button>`).join('')}</div>`;
+  };
+  pintarEspaciosFn();
+}
+addEventListener('ambitocambio',()=>{if(pintarEspaciosFn)pintarEspaciosFn()});
 
 // ---------- Pantalla «Mi cuenta» (cualquier rol): datos propios y contraseña ----------
 vistas.cuenta=contenedor=>{
   const actor=sesion();if(!actor)return;
-  const m=actor.rol==='mision'?misionPorId(actor.misionId):null;     // solo la cuenta Misión cambia el botón de inicio de su misión
+  const m=nivelActivo()==='mision'?misionPorId(ambitoActual()):null;     // solo la cuenta Misión cambia el botón de inicio de su misión
   const creador=U.find(x=>x.id===actor.creadoPor);
-  const sinVerificar=!!creador&&(creador.rol==='mision'||esEditorMision(creador))&&!!auth.currentUser&&!auth.currentUser.emailVerified;
+  const sinVerificar=!!creador&&rolesDe(creador).some(r=>r.nivel==='mision'||r.nivel==='editor-mision')&&!!auth.currentUser&&!auth.currentUser.emailVerified;
   let foto=actor.foto||'',logoApp=(m&&m.logo)||'';
   contenedor.innerHTML=`<div class="ch2"><h1>Mi cuenta</h1></div>
     ${sinVerificar?`<div style="background:var(--oro-claro);border-radius:var(--r-m);padding:12px 14px;margin-bottom:14px"><b>Verifica tu correo</b><p style="margin:4px 0 10px;color:var(--gris);font-size:13.5px">Tu correo aún no está verificado. Puedes hacerlo cuando quieras: te enviamos un mensaje con un enlace.</p><div class="barra" style="margin:0"><button id="bv">Enviar correo de verificación</button><button class="sec" id="bv2">Ya lo verifiqué</button></div></div>`:''}
@@ -329,7 +384,7 @@ function pintarEquipo(actor){
 // Vista del Administrador (y su Editor): Usuarios (espacio general) / Misiones (con su propio
 // equipo anidado en cada tarjeta) / Administración (nombre, logo, copia de seguridad).
 function pintarAdmin(actor){
-  const rango=u=>u.id===actor.id?0:(u.rol==='admin'?1:2);        // tu cuenta primero, luego los demás Administradores, luego los Editores
+  const rango=u=>u.id===actor.id?0:(esAdminU(u)?1:2);        // tu cuenta primero, luego los demás Administradores, luego los Editores
   const admins=cuentasVisibles(actor).sort((a,b)=>rango(a)-rango(b)||(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
   const misiones=listaMisiones();
   const h=huerfanos();
@@ -377,10 +432,10 @@ function cablearAdministracion(){
 // ---------- Misiones (anidadas aquí: ver banner de arriba de este archivo) ----------
 // equipoTodos: todas las cuentas de esta misión (cualquier nivel), para anidarlas en su tarjeta
 // en vez de mezclarlas con las demás en la sección «Usuarios» (ver cuentasVisibles).
-const equipoTodos=id=>U.filter(u=>u.misionId===id).sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
+const equipoTodos=id=>U.filter(u=>enMision(u,id)).sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
 // huerfanos: cuentas cuya misión ya no existe (se borró la misión a la que pertenecían). Sin
 // esto quedarían invisibles (y por lo tanto imposibles de gestionar) en esta pantalla.
-const huerfanos=()=>U.filter(u=>u.misionId&&!misionPorId(u.misionId));
+const huerfanos=()=>U.filter(u=>rolesDe(u).some(r=>!esNivelGeneral(r.nivel)&&!misionPorId(r.misionId)));
 const misAbiertas=new Set();   // misiones desplegadas (se recuerdan aunque la pantalla se vuelva a dibujar)
 
 // misionFila: una misión = bandera, nombre (y debajo el país y cuántas cuentas tiene), sus
@@ -395,7 +450,7 @@ function misionFila(m){
       <button type="button" class="mas" data-mas="m:${m.id}" aria-haspopup="menu" aria-label="Opciones de la misión ${esc(m.nombre)}" title="Opciones">${PUNTOS}</button>
     </div>
     ${abierta?`<div class="mfila-cab"><div class="un"><small>${esc(sub)}</small></div></div>
-    ${equipo.length?`<div class="mroster">${equipo.map(u=>fila(u,actor,'roster')).join('')}</div>`:''}`:''}
+    ${equipo.length?`<div class="mroster">${equipo.map(u=>fila(u,actor,'roster',m.id)).join('')}</div>`:''}`:''}
   </div>`;
 }
 
@@ -424,14 +479,30 @@ function formularioMision(m){
   const primero=nueva?$('.sb-btn',o):$('#fn',o);if(primero)primero.focus();
 }
 
-export function fila(u,actor,ctx){
+// chipsDe: las etiquetas de la fila de una cuenta. En «Usuarios» (ctx 'general') su rol general y cuántas misiones más
+// tiene; dentro de una misión (ctx 'roster' con su id, o la vista de equipo) solo su rol EN esa misión.
+function chipsDe(u,ctx,mid){
+  const R=rolesDe(u),out=[];
+  const corta=n=>n==='admin'?'Administrador':n==='editor-admin'?'Editor':n==='editor-mision'?(ctx==='roster'?'Editor de misión':'Editor'):'';   // Misión y Usuario no llevan etiqueta
+  if(ctx==='general'){
+    R.filter(r=>esNivelGeneral(r.nivel)).forEach(r=>out.push(corta(r.nivel)));
+    const n=R.filter(r=>!esNivelGeneral(r.nivel)).length;
+    if(n)out.push('+ '+n+(n===1?' misión':' misiones'));
+  }else{
+    const aqui=R.filter(r=>!esNivelGeneral(r.nivel)&&(mid?r.misionId===mid:!misionPorId(r.misionId)));   // sin mid: las de misiones que ya no existen
+    aqui.forEach(r=>out.push(corta(r.nivel)));
+    if(R.length>aqui.length)out.push('Varios espacios');
+  }
+  return out.filter(Boolean);
+}
+export function fila(u,actor,ctx,mid){
   const edita=puedeEditarCuenta(u,actor);
   const tuya=u.id===actor.id;
   const pendiente=u.requiereVerificacion&&!u.emailVerified&&u.id!==actor.id;
-  const sub=etiquetaCorta(u,ctx);
+  const chips=chipsDe(u,ctx,mid||(ctx?undefined:miMision()));
   return `<div class="ufila${u.activo===false?' inactiva':''}">
     <div class="un"><b>${esc(u.nombre||u.correo)}${tuya?' (tú)':''}</b><small>${esc(u.correo||'')}${u.activo===false?' · Desactivada':''}</small></div>
-    ${sub?`<span class="rolchip">${esc(sub)}</span>`:''}
+    ${chips.map(t=>`<span class="rolchip">${esc(t)}</span>`).join('')}
     ${pendiente?`<span class="pend">Sin verificar correo</span>`:''}
     ${edita?`<button class="mas" data-mas="u:${u.id}" aria-haspopup="menu" aria-label="Opciones de ${esc(u.nombre||u.correo)}" title="Opciones">${PUNTOS}</button>`:''}
   </div>`;
@@ -448,7 +519,7 @@ function clic(e){
 
 function eliminarCuenta(u){
   if(!u||!puedeEliminarCuenta(u,sesion()))return;
-  if(u.rol==='admin'&&U.filter(x=>x.rol==='admin').length<=1)return alert('Debe quedar al menos una cuenta de Administrador.');
+  if(esAdminU(u)&&U.filter(esAdminU).length<=1)return alert('Debe quedar al menos una cuenta de Administrador.');
   if(confirm('¿Eliminar la cuenta "'+(u.nombre||u.correo)+'"? Dejará de verse en la app, pero su acceso de inicio de sesión no queda totalmente revocado (eso requiere la consola de Firebase). Para solo quitarle el acceso, mejor desactívala desde «Editar».')){
     eliminar('usuarios',u,'la cuenta "'+(u.nombre||u.correo)+'"',true);
   }
@@ -456,7 +527,7 @@ function eliminarCuenta(u){
 function eliminarMision(m){
   if(!m||!esNivelAdmin())return;
   const n=equipoTodos(m.id).length;
-  if(n)return alert(`Esta misión tiene ${n} ${n===1?'cuenta':'cuentas'}. Primero pasa esas cuentas a otra misión, o elimínalas (desde esta misma pantalla).`);
+  if(n)return alert(`Esta misión tiene ${n} ${n===1?'cuenta':'cuentas'}. Primero quítales esta misión (con «Editar»), o elimina esas cuentas (desde esta misma pantalla).`);
   eliminar('misiones',m,'la misión "'+m.nombre+'"');
 }
 
@@ -502,38 +573,74 @@ const ERRORES_AUTH={
   'auth/invalid-email':'Ese correo no es válido.',
   'auth/weak-password':'La contraseña debe tener al menos 6 caracteres.'
 };
-function formNuevo(){
-  const actor=sesion(),roles=rolesCreables(actor);
-  if(!roles.length)return;
-  const elegirMision=esNivelAdmin();                // el Administrador y su Editor eligen la misión; una cuenta de misión crea siempre dentro de la suya
+// editorRoles: la lista de roles de una cuenta, una fila «Nivel + Misión» por espacio (el nivel Administrador y su
+// Editor son del espacio general y no llevan misión). varias=true deja añadir y quitar filas (solo el Administrador);
+// misionFija = id de misión que se usa siempre (una cuenta de misión crea solo dentro de la suya).
+// Devuelve {leer(), validar()}: leer() da [{nivel,misionId}], validar() da un texto de error o null.
+function editorRoles(zona,{filas,niveles,varias,misionFija}){
+  const norm=id=>!id||id==='sin-mision'?'':id;
+  let F=filas.map(f=>({nivel:f.nivel,misionId:esNivelGeneral(f.nivel)?'':norm(f.misionId)}));
   const misiones=listaMisiones();
+  const pinta=()=>{
+    zona.innerHTML=(varias?'<div style="font-weight:700;margin:4px 0 8px">Roles <span style="color:var(--gris);font-weight:500">(uno por espacio)</span></div>':'')
+      +F.map((f,i)=>{
+        const gen=esNivelGeneral(f.nivel),huerfana=f.misionId&&!misionPorId(f.misionId);
+        return `<div class="rfila" data-i="${i}">
+          <label class="fl2">Nivel<select data-rn>${niveles.map(([v,t])=>`<option value="${v}" ${v===f.nivel?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
+          ${misionFija?'':`<label class="fl2" ${gen?'hidden':''}>Misión<select data-rm>${f.misionId?'':'<option value="">(elige una misión)</option>'}${huerfana?`<option value="${esc(f.misionId)}" selected>(misión eliminada)</option>`:''}${misiones.map(m=>`<option value="${m.id}" ${m.id===f.misionId?'selected':''}>${esc(etiquetaMision(m))}</option>`).join('')}</select></label>`}
+          ${varias&&F.length>1?`<button type="button" class="ic" data-rq="${i}" aria-label="Quitar este rol" title="Quitar este rol">${ic('trs',15)}</button>`:''}
+        </div>`}).join('')
+      +(varias?`<button type="button" class="sec" data-ra style="margin-bottom:12px">${ic('pls',15)} Añadir rol</button>`:'');
+  };
+  pinta();
+  zona.onchange=e=>{
+    const fila=e.target.closest('.rfila');if(!fila)return;const f=F[+fila.dataset.i];
+    if(e.target.matches('[data-rn]')){f.nivel=e.target.value;if(esNivelGeneral(f.nivel))f.misionId='';pinta()}
+    else if(e.target.matches('[data-rm]'))f.misionId=e.target.value;
+  };
+  zona.onclick=e=>{
+    const b=e.target.closest('button');if(!b)return;
+    if(b.dataset.rq!=null){F.splice(+b.dataset.rq,1);pinta()}
+    else if(b.dataset.ra!=null){F.push({nivel:(niveles.find(([v])=>v==='usuario')||niveles[0])[0],misionId:''});pinta()}
+  };
+  const leer=()=>F.map(f=>({nivel:f.nivel,misionId:esNivelGeneral(f.nivel)?null:(misionFija||f.misionId)}));
+  const validar=()=>{
+    const R=leer(),usados=new Set();
+    if(!R.length)return 'La cuenta necesita al menos un rol.';
+    for(const r of R){
+      if(!niveles.some(([v])=>v===r.nivel))return 'Ese nivel no está permitido para tu cuenta.';
+      if(!esNivelGeneral(r.nivel)&&(!r.misionId||r.misionId==='sin-mision'))return 'Elige la misión de cada rol, o crea una misión primero.';
+      const esp=esNivelGeneral(r.nivel)?GENERAL:r.misionId;
+      if(usados.has(esp))return 'Solo puede tener un rol por espacio (el general o cada misión). Quita el repetido.';
+      usados.add(esp);
+    }
+    return null;
+  };
+  return {leer,validar};
+}
+
+function formNuevo(){
+  const actor=sesion(),niveles=rolesCreables();
+  if(!niveles.length)return;
+  const varias=esAdministrador();                  // solo el Administrador da varios roles a una misma cuenta
+  const fija=esNivelAdmin()?null:miMision();       // una cuenta de misión crea siempre dentro de la suya; el Administrador y su Editor eligen
   const o=modal(`<div class="mh"><h2>Nueva cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Correo<input id="fe" type="email" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Contraseña (mínimo 6 caracteres)<input id="fc" type="text" autocomplete="off"></label>
-    <label class="fl2" style="margin-bottom:12px">Nivel<select id="fr">${roles.map(([v,t])=>`<option value="${v}">${esc(t)}</option>`).join('')}</select></label>
-    ${elegirMision?`<label class="fl2" id="fmw" style="margin-bottom:12px">Misión<select id="fm">${misiones.map(m=>`<option value="${m.id}">${esc(etiquetaMision(m))}</option>`).join('')||'<option value="">(crea primero una misión)</option>'}</select></label>`:''}
+    <div id="rl"></div>
     <p class="error" role="alert" hidden></p>
     <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Crear</button></div>`);
-  const actualizaCampos=()=>{
-    const wm=$('#fmw',o);if(wm)wm.hidden=!necesitaMision($('#fr',o).value);   // Administrador y su Editor no pertenecen a ninguna misión
-  };
-  actualizaCampos();
-  $('#fr',o).onchange=actualizaCampos;
+  const rl=editorRoles($('#rl',o),{filas:[{nivel:niveles[0][0],misionId:fija||''}],niveles,varias,misionFija:fija});
   const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
   const aceptar=async()=>{
-    const nombre=$('#fn',o).value.trim(),correo=$('#fe',o).value.trim(),clave=$('#fc',o).value,nivel=$('#fr',o).value;
+    const nombre=$('#fn',o).value.trim(),correo=$('#fe',o).value.trim(),clave=$('#fc',o).value;
     if(!correo||!clave)return err('Escribe correo y contraseña.');
-    if(!roles.some(([v])=>v===nivel))return err('Ese nivel no está permitido para tu cuenta.');
-    let misionId=null;                              // misionId = el id de la misión (null para el Administrador y su Editor)
-    if(necesitaMision(nivel)){
-      misionId=elegirMision?($('#fm',o).value||''):miMision(actor);
-      if(!misionId)return err('Elige la misión a la que pertenece, o crea una misión primero.');
-    }
+    const problema=rl.validar();if(problema)return err(problema);
     const btn=$('#ok',o);btn.disabled=true;
     try{
       const uid=await crearCuentaComoAdmin(correo,clave);
-      await guardar('usuarios',uid,{nombre:nombre||correo,correo,...datosDeNivel(nivel),misionId,activo:true,creadoPor:actor.id,requiereVerificacion:false,creadoEn:Date.now()});
+      await guardar('usuarios',uid,{nombre:nombre||correo,correo,...camposDeRoles(rl.leer()),activo:true,creadoPor:actor.id,requiereVerificacion:false,creadoEn:Date.now()});
       o.remove();aviso('Cuenta creada.');
     }catch(ex){
       btn.disabled=false;
@@ -546,43 +653,43 @@ function formNuevo(){
 
 export function formEditar(u){
   if(!u)return;
-  const cambiaNivel=esNivelAdmin();                             // el Administrador y su Editor cambian niveles (el Editor no puede crear Administradores)
-  const cambiaMision=esNivelAdmin();                            // el Administrador y su Editor pasan una cuenta a otra misión (una cuenta de misión no)
-  const nivelAct=nivelDe(u);
-  const sinMision=!u.misionId||!misionPorId(u.misionId);
+  const actor=sesion(),propia=u.id===actor.id;
+  const roles=rolesDe(u);
+  const editaRoles=esNivelAdmin();                              // el Administrador y su Editor cambian niveles y misiones (una cuenta de misión no)
+  const varias=esAdministrador();                               // solo el Administrador da o quita roles (varios por cuenta)
+  const bloqueado=editaRoles&&!varias&&roles.length>1;          // el Editor del administrador no toca cuentas con varios roles
+  const niveles=Object.entries(NIVELES).filter(([v])=>esAdministrador()||v!=='admin');
   const pendiente=u.requiereVerificacion&&!u.emailVerified;
   const o=modal(`<div class="mh"><h2>Editar cuenta</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <label class="fl2" style="margin-bottom:12px">Nombre<input id="fn" value="${esc(u.nombre||'')}" autocomplete="off"></label>
     <label class="fl2" style="margin-bottom:12px">Correo<input id="fe" value="${esc(u.correo||'')}" disabled></label>
-    ${cambiaNivel?`<label class="fl2" style="margin-bottom:12px">Nivel<select id="fr">${Object.entries(NIVELES).filter(([v])=>esAdministrador()||v!=='admin').map(([v,t])=>`<option value="${v}" ${v===nivelAct?'selected':''}>${esc(t)}</option>`).join('')}</select></label>`:''}
-    ${cambiaMision?`<label class="fl2" id="fmw" style="margin-bottom:12px">Misión<select id="fm">${sinMision?'<option value="">(elige una misión)</option>':''}${listaMisiones().map(m=>`<option value="${m.id}" ${m.id===u.misionId?'selected':''}>${esc(etiquetaMision(m))}</option>`).join('')}</select></label>`:''}
+    ${editaRoles&&!bloqueado?'<div id="rl"></div>':''}
+    ${bloqueado?`<p style="margin:0 0 12px;color:var(--gris);font-size:13.5px"><b style="color:var(--tx)">Roles:</b> ${esc(descripcionRoles(u))}.<br>Esta cuenta tiene varios roles: solo un Administrador puede cambiarlos.</p>`:''}
     <p style="margin:0 0 12px;color:var(--gris);font-size:13.5px">La contraseña solo la cambia cada cuenta desde el botón «Mi cuenta» de su propia sesión. El correo no se puede cambiar aquí.</p>
-    ${pendiente?`<label class="chk" style="margin:2px 0 14px"><input type="checkbox" id="fv"> Dejarla entrar sin verificar su correo (si quedó bloqueada y no le llega el correo)</label>`:''}
-    <label class="chk" style="margin:2px 0 14px"><input type="checkbox" id="fa" ${u.activo===false?'':'checked'}> Cuenta activa (puede iniciar sesión)</label>
+    ${pendiente&&!propia?`<label class="chk" style="margin:2px 0 14px"><input type="checkbox" id="fv"> Dejarla entrar sin verificar su correo (si quedó bloqueada y no le llega el correo)</label>`:''}
+    ${propia?'':`<label class="chk" style="margin:2px 0 14px"><input type="checkbox" id="fa" ${u.activo===false?'':'checked'}> Cuenta activa (puede iniciar sesión)</label>`}
     <p class="error" role="alert" hidden></p>
     <div class="barra" style="justify-content:flex-end;margin:6px 0 0"><button class="sec" data-cx>Cancelar</button><button id="ok">Guardar</button></div>`);
-  const nivelElegido=()=>cambiaNivel?$('#fr',o).value:nivelAct;
-  const actualizaCampos=()=>{const wm=$('#fmw',o);if(wm)wm.hidden=!necesitaMision(nivelElegido())};
-  actualizaCampos();
-  if(cambiaNivel)$('#fr',o).onchange=actualizaCampos;
+  const rl=editaRoles&&!bloqueado?editorRoles($('#rl',o),{filas:roles,niveles,varias,misionFija:null}):null;
   const err=t=>{const p=$('.error',o);p.textContent=t;p.hidden=!t};
+  const clave=R=>R.map(r=>r.nivel+'@'+(esNivelGeneral(r.nivel)||r.misionId==='sin-mision'?'':(r.misionId||''))).sort().join('|');
   const aceptar=()=>{
-    const nombre=$('#fn',o).value.trim(),activo=$('#fa',o).checked,nivel=nivelElegido();
-    const cambios={nombre:nombre||u.correo,activo};
-    const cambioNivel=nivel!==nivelAct;
-    if(nivel==='admin'&&cambioNivel&&!esAdministrador())return err('Solo un Administrador puede crear otro Administrador.');
-    if(cambioNivel){
-      if(u.rol==='admin'&&!confirm('«'+(u.nombre||u.correo)+'» dejará de ser Administrador y pasará a «'+NIVELES[nivel]+'». ¿Continuar?'))return;
-      Object.assign(cambios,datosDeNivel(nivel));
+    const nombre=$('#fn',o).value.trim();
+    const cambios={nombre:nombre||u.correo};
+    if(!propia)cambios.activo=$('#fa',o).checked;
+    if(rl){
+      const problema=rl.validar();if(problema)return err(problema);
+      const nuevos=rl.leer();
+      if(nuevos.some(r=>r.nivel==='admin')&&!esAdministrador())return err('Solo un Administrador puede crear otro Administrador.');
+      if(clave(nuevos)!==clave(roles)){                            // los campos de roles solo se escriben si de verdad cambiaron
+        if(roles.some(r=>r.nivel==='admin')&&!nuevos.some(r=>r.nivel==='admin')){
+          if(U.filter(esAdminU).length<=1)return err('Debe quedar al menos una cuenta de Administrador.');
+          if(!confirm('«'+(u.nombre||u.correo)+'» dejará de ser Administrador. ¿Continuar?'))return;
+        }
+        Object.assign(cambios,camposDeRoles(nuevos));
+      }
     }
-    if(!necesitaMision(nivel)){
-      if(cambioNivel)cambios.misionId=null;         // pasa al espacio general
-    }else if(cambiaMision){
-      const v=$('#fm',o).value;
-      if(!v)return err('Elige la misión de esta cuenta.');
-      cambios.misionId=v;
-    }
-    if(pendiente&&$('#fv',o).checked)cambios.requiereVerificacion=false;
+    if(pendiente&&!propia&&$('#fv',o).checked)cambios.requiereVerificacion=false;
     guardar('usuarios',u.id,cambios);
     o.remove();aviso('Cambios guardados.');
   };
@@ -613,7 +720,7 @@ function novedades(){
     tipo:'cuenta',
     creadoEn:u.creadoEn||0,
     titulo:u.nombre||u.correo,
-    sub:[etiquetaRol(u),misionDe(u)].filter(Boolean).join(' · ')
+    sub:descripcionRoles(u)
   }));
   const canciones=E.canciones.map(c=>({
     tipo:'cancion',
