@@ -153,10 +153,10 @@ header .salir:hover{background:#ffffff26;filter:none}
 .card details summary::-webkit-details-marker,.fila2 details summary::-webkit-details-marker{display:none}
 .card details summary:hover,.fila2 details summary:hover{background:#fff}
 .card details[open],.fila2 details[open]{z-index:4}
-.card details>div,.fila2 details>div{background:var(--blanco);box-shadow:var(--sombra-2);border:2px solid #CBD2E3;border-radius:var(--r-m);padding:6px;display:grid;gap:2px;width:210px;position:absolute;right:0;margin-top:6px;text-align:left}
-.card details>div button,.fila2 details>div button{background:transparent;color:var(--tx);justify-content:flex-start;font-weight:600;min-height:36px;padding:6px 10px;border-radius:var(--r-s)}
+.card details>div,.fila2 details>div{background:var(--blanco);box-shadow:var(--sombra-2);border:1px solid var(--linea);border-radius:12px;padding:6px;display:grid;gap:2px;min-width:176px;width:max-content;max-width:min(210px,calc(100vw - 24px));position:absolute;right:0;margin-top:6px;text-align:left}
+.card details>div button,.fila2 details>div button{background:transparent;color:var(--tx);justify-content:flex-start;font-weight:600;min-height:38px;padding:6px 10px;border-radius:8px}
 .card details>div button:hover,.fila2 details>div button:hover{background:var(--capa);filter:none!important}
-.card details>div button.rojo,.fila2 details>div button.rojo{color:var(--rojo);font-weight:700;border-top:1px solid var(--linea);border-radius:0 0 var(--r-s) var(--r-s);margin-top:4px;padding-top:9px}
+.card details>div button.rojo,.fila2 details>div button.rojo{color:var(--rojo);font-weight:700;border-top:1px solid var(--linea);border-radius:0 0 8px 8px;margin-top:4px;padding-top:9px}
 .card details>div button.rojo svg,.fila2 details>div button.rojo svg{color:var(--rojo)}
 .card details>div button.rojo:hover,.fila2 details>div button.rojo:hover{background:var(--rojo-claro)}
 
