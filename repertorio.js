@@ -1,5 +1,5 @@
 // ===== PANTALLA: REPERTORIO (misa y evento, vista previa y PDF) =====
-import {$,esc,guardar,crear,eliminar,vistas,ic,modal,aviso} from "./base.js";
+import {$,esc,guardar,crear,eliminar,vistas,ic,modal,aviso,sesion,nivelActivo} from "./base.js";
 import {MOM,MES,fechaLarga,cancion,textosDespues,esPeticiones,lineasTx,lineasTxHtml,fcss,OKC} from "./hoja.js";
 import {FIJAS,PROPOR,colorOk,CT} from "./formato.js";
 import {elegirEscala,textoEquipo,equipoDe,alCambiarEquipos} from "./equipos.js";
@@ -73,15 +73,21 @@ const CPY='<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2
 const fechaCorta=f=>{if(!f)return'Sin fecha';const [y,m,d]=f.split('-');return d+'/'+m+'/'+y};
 
 let C=[],T=[],A=[],R=[],el=null,rep=null,tm=null;
-let pestana='misa';try{if(localStorage.getItem('pestanaRep')==='evento')pestana='evento'}catch(e){}   // pestaña Misas | Eventos de la lista
+let pestana='misa';try{const p=localStorage.getItem('pestanaRep');if(p==='evento'||p==='milista')pestana=p}catch(e){}   // pestaña Misas | Mi lista | Eventos de la lista
+let RL=[],ML=null,momento='',ov={};      // RL: todos los repertorios (incluye «Mi lista»); ML: id de la lista abierta; ov: canciones recién cambiadas, mientras llega la copia de Firebase
+const yo=()=>{const s=sesion();return s?s.id:null};
+const esDeUsuario=()=>nivelActivo()==='usuario';
+// ¿este repertorio se ve en las pestañas Misas y Eventos? Las «Mi lista» no. Una cuenta «Usuario» solo ve los que creó ella
+// (privado:true + duenoId); los demás niveles ven los compartidos de la misión y los suyos.
+const visibleRep=r=>!r.miLista&&(esDeUsuario()?r.duenoId===yo():(!r.privado||r.duenoId===yo()));
 const alb=c=>A.find(a=>a.id===c.albumId)?.nombre||'';
 const titAlb=c=>`<span>${esc(c.titulo)}</span>`+(alb(c)?`<small>${esc(alb(c))}</small>`:'');
-const ref=()=>{if(el)rep?pder():lista()};
+const ref=()=>{if(!el)return;if(ML)pintarML();else if(rep)pder();else lista()};
 alCambiarEquipos(()=>{if(el&&rep){pizq();pder()}});
 // Los datos (ya filtrados por misión, ver estado.js) se leen de ahí en vez de escucharlos por
 // cuenta propia: antes esto leía canciones/álbumes SIN filtrar por misión (mismo tipo de bug
 // que se corrigió en escalas.js), y encima los leía de nuevo aunque ya los tuviera estado.js.
-alCambiar(()=>{C=E.canciones;T=E.etiquetas;A=E.albumes;R=E.repertorios.filter(r=>!r.miLista);ref()});   // Chigo: la lista de repertorios ya no incluye las de «Mi lista» (miLista:true)
+alCambiar(()=>{C=E.canciones;T=E.etiquetas;A=E.albumes;if(RL!==E.repertorios){RL=E.repertorios;ov={}}R=RL.filter(visibleRep);ref()});   // «ov» solo se limpia cuando lo que cambió fue de verdad «repertorios»
 const rand=()=>Math.random().toString(36).slice(2,8);
 const sec=id=>rep.secciones.find(s=>s.id===id);
 // ===== CHIGO · Etiquetas separadas en «Misas» y «Otros» (ver etiquetas.js) =====
@@ -98,21 +104,31 @@ const guarda=()=>{clearTimeout(tm);tm=setTimeout(flush,300)};
 function flush(){clearTimeout(tm);tm=null;if(rep){const {id,...d}=rep;guardar('repertorios',id,d,false)}}
 
 vistas.repertorio=e=>{
-  el=e;rep=null;el.onclick=clic;el.oninput=entra;el.onchange=entra;el.onkeydown=teclaTx;el.onpaste=pegaTx;el.onmousedown=e=>{if(e.target.closest('.fbx'))e.preventDefault()};   // los botones de formato no le quitan la selección al texto
+  el=e;rep=null;ML=null;el.onclick=clic;el.oninput=entra;el.onchange=entra;el.onkeydown=teclaTx;el.onpaste=pegaTx;el.onmousedown=e=>{if(e.target.closest('.fbx'))e.preventDefault()};   // los botones de formato no le quitan la selección al texto
   const a=sessionStorage.getItem('repAbrir'),f=sessionStorage.getItem('repFecha'),n=sessionStorage.getItem('repNuevo');
   sessionStorage.removeItem('repAbrir');sessionStorage.removeItem('repFecha');sessionStorage.removeItem('repNuevo');
   if(a&&R.find(x=>x.id===a))abrir(a);
   else if(n){try{const v=JSON.parse(n);nuevo(v.fecha,v.tipo,v.nombre,v.evento)}catch(err){lista()}}   // creado desde el Calendario
   else if(f)nuevo(f,pestana);else lista();
 };
-addEventListener('hashchange',()=>{if(location.hash!=='#repertorio'){cerrarEq();flush();el=null;rep=null}});
-addEventListener('reinicio',e=>{if(e.detail==='repertorio'&&el){flush();rep=null;lista()}});
+addEventListener('hashchange',()=>{if(location.hash!=='#repertorio'){cerrarEq();flush();el=null;rep=null;ML=null}});
+addEventListener('reinicio',e=>{if(e.detail==='repertorio'&&el){flush();rep=null;ML=null;lista()}});
 
 function lista(){
   el.className="";
   const cuadro=f=>{if(!f)return '<b>\u2013</b><span>Sin fecha</span>';const [y,m,d]=f.split('-').map(Number);return `<b>${d}</b><span>${MES[m-1].slice(0,3)}${y!==new Date().getFullYear()?' '+y:''}</span>`};
   const cuantas=r=>{const n=r.tipo==='evento'?(r.secciones||[]).reduce((a,x)=>a+(x.canciones||[]).length,0):Object.values(r.misa||{}).filter(Boolean).length;return n?n+(n>1?' canciones':' canci\u00f3n'):'Sin canciones'};
-  el.innerHTML=`<div class="ch2"><h1>Repertorios</h1><div class="rtabs"><div class="seg" role="group" aria-label="Tipo de repertorio"><button data-pest="misa" class="${pestana==='misa'?'on':''}" aria-pressed="${pestana==='misa'}">Misas</button><button data-pest="evento" class="${pestana==='evento'?'on':''}" aria-pressed="${pestana==='evento'}">Eventos</button></div><button data-nuevo aria-label="${pestana==='evento'?'Nuevo repertorio de evento':'Nuevo repertorio de misa'}" title="${pestana==='evento'?'Nuevo repertorio de evento':'Nuevo repertorio de misa'}">${ic('pls',18)}</button></div></div><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">`
+  const nueva=pestana==='evento'?'Nuevo repertorio de evento':pestana==='milista'?'Nueva lista':'Nuevo repertorio de misa';
+  const pes=(k,t)=>`<button data-pest="${k}" class="${pestana===k?'on':''}" aria-pressed="${pestana===k}">${t}</button>`;
+  const cab=`<div class="ch2"><h1>Repertorios</h1><div class="rtabs"><div class="seg" role="group" aria-label="Tipo de repertorio">${pes('misa','Misas')}${pes('milista','Mi lista')}${pes('evento','Eventos')}</div><button data-nuevo aria-label="${nueva}" title="${nueva}">${ic('pls',18)}</button></div></div>`;
+  if(pestana==='milista'){                                       // las listas propias de quien esta usando la app
+    const ls=mias().sort((a,b)=>(b.creadoEn||0)-(a.creadoEn||0));
+    el.innerHTML=cab+(ls.length
+      ?`<div class="ml-grid">${ls.map(r=>`<div class="card ml-card" data-ml-open="${r.id}" role="button" tabindex="0"><div class="ml-t"><b>${esc(r.nombre||'Sin nombre')}</b><small>${cuentaML(r)}</small></div><button class="ic" data-ml-borrar="${r.id}" aria-label="Eliminar \u00ab${esc(r.nombre||'Sin nombre')}\u00bb" title="Eliminar">${ic('trs',16)}</button></div>`).join('')}</div>`
+      :'<p class="vacio">A\u00fan no tienes listas. Pulsa \u00ab+\u00bb para crear la primera.</p>');
+    return;
+  }
+  el.innerHTML=cab+`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">`
     +R.filter(r=>(r.tipo==='evento'?'evento':'misa')===pestana).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(r=>`<div class="card rcard" data-open="${r.id}" role="button" tabindex="0"><div class="cf" aria-hidden="true">${cuadro(r.fecha)}</div><div class="ri"><b>${esc(r.nombre||'Sin nombre')}</b><small>${cuantas(r)}</small><span class="tipo">${r.tipo==='evento'?'Evento':'Misa'}</span></div><button class="ic rj" data-del="${r.id}" aria-label="Eliminar \u00ab${esc(r.nombre||'Sin nombre')}\u00bb" title="Eliminar">${ic('trs',16)}</button></div>`).join('')
     +'</div>'+(R.some(r=>(r.tipo==='evento'?'evento':'misa')===pestana)?'':`<p class="vacio">A\u00fan no hay repertorios de ${pestana==='evento'?'eventos':'misas'}. Pulsa \u00ab+\u00bb para crear el primero.</p>`);
 }
@@ -120,6 +136,7 @@ function lista(){
 // Si viene de un evento del Calendario, el evento guarda el id de este repertorio.
 async function nuevo(f,tipo,nombre,evento){
   const d={nombre:nombre||'Nuevo repertorio',fecha:f||'',tipo:tipo==='evento'?'evento':'misa',acordes:false,misa:{},secciones:[],textos:{},textosOrd:[]};
+  if(esDeUsuario()){d.privado=true;d.duenoId=yo()}                // lo que crea una cuenta «Usuario» es solo suyo (no sale en el Calendario ni lo ve la misión)
   const r=await crear('repertorios',d);
   if(evento)guardar('eventos',evento,{repertorioId:r.id});
   pestana=d.tipo;rep={id:r.id,...d};editor();
@@ -243,9 +260,16 @@ function imprimir(){
 }
 
 function clic(e){
-  const b=e.target.closest('[data-nuevo],[data-open],[data-del],[data-back],[data-print],[data-copy],[data-share],[data-pest],[data-mesc],[data-mescq],[data-escver],[data-sesc],[data-sescq],[data-alet],[data-pick],[data-rnd],[data-rm],[data-sadd],[data-sdel],[data-spick],[data-srm],[data-xnew],[data-xup],[data-xdn],[data-xdel],[data-fx]');
+  const b=e.target.closest('[data-nuevo],[data-open],[data-del],[data-back],[data-print],[data-copy],[data-share],[data-pest],[data-mesc],[data-mescq],[data-escver],[data-sesc],[data-sescq],[data-alet],[data-pick],[data-rnd],[data-rm],[data-sadd],[data-sdel],[data-spick],[data-srm],[data-xnew],[data-xup],[data-xdn],[data-xdel],[data-fx],[data-ml-open],[data-ml-borrar],[data-ml-volver],[data-ml-add],[data-ml-quitar],[data-ml-share],[data-ml-ver]');
   if(!b)return;const d=b.dataset,ok=()=>{cerrarEq();guarda();pizq();pder(true)};
-  if(d.nuevo!=null)nuevo('',pestana);
+  if(d.nuevo!=null){pestana==='milista'?nuevaML():nuevo('',pestana)}
+  else if(d.mlBorrar){const r=mias().find(x=>x.id===d.mlBorrar);if(r)eliminar('repertorios',r,'\u00ab'+(r.nombre||'esta lista')+'\u00bb')}
+  else if(d.mlOpen){ML=d.mlOpen;editorML()}
+  else if(d.mlVolver!=null){ML=null;lista()}
+  else if(d.mlAdd!=null)elegirML();
+  else if(d.mlQuitar){const r=actualML();if(r)ponCancionesML(r,cancionesDeML(r).filter(x=>x!==d.mlQuitar))}
+  else if(d.mlShare!=null)compartirML();
+  else if(d.mlVer!=null){const r=actualML();if(!r)return;if(!cancionesDeML(r).length)return aviso('A\u00f1ade canciones para poder verla.');window.open(enlaceML(r),'_blank','noopener')}
   else if(d.pest){pestana=d.pest;try{localStorage.setItem('pestanaRep',pestana)}catch(err){}lista();const t=el.querySelector(`[data-pest="${pestana}"]`);if(t)t.focus()}
   else if(d.escver)verEquipo(b,d.escver==='m'?rep.escala:sec(d.escver)?.escala);                  // ventanita con las personas de la escala
   else if(d.mesc!=null)elegirEscala(rep.escala,v=>{rep.escala=v;ok()});                          // una escala para toda la misa
@@ -426,7 +450,9 @@ function fmtTx(id,f){
 }
 
 function entra(e){
-  const t=e.target;if(!rep)return;
+  const t=e.target;
+  if(t.id==='ml-n'||t.id==='ml-m'){cambiaML(e);return}   // nombre y filtro de una «Mi lista»
+  if(!rep)return;
   if(t.id==='rn'){rep.nombre=t.value;guarda();pder()}
   else if(t.id==='rf'){rep.fecha=t.value;guarda();pder()}
   else if(t.id==='ra'&&e.type==='change'){rep.acordes=t.checked;guarda();pder()}
@@ -451,4 +477,139 @@ function elegir(titulo,cands,cb){
   o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.dataset.s){o.remove();cb(b.dataset.s)}};
   o.oninput=e=>{if(e.target.id==='bq'){q=e.target.value;p();const i=$('#bq',o);i.focus();i.setSelectionRange(999,999)}};
   o.onchange=e=>{if(e.target.id==='vt'){todas=e.target.checked;p()}};
+}
+
+// =====================================================================
+//  MI LISTA  ·  pestaña de Repertorio, entre «Misas» y «Eventos»  (antes era la pantalla milista.js)
+//
+//  Cada persona crea las listas de canciones que quiera para verlas, tocarlas en su ensayo o
+//  compartirlas. Cada lista tiene: Nombre · Canción (filtro) · botón «Añadir canción».
+//   - «Canción» solo sirve para encontrar canciones: muestra las que tienen esa etiqueta (las del
+//     grupo «Otros», ver etiquetas.js). No se guarda dentro de la lista ni separa las canciones.
+//   - Compartir / Abrir usan la pantalla #ver/ID (ver.js).
+//
+//  DÓNDE SE GUARDA: en la colección «repertorios» de Firestore (la misma que usa #ver/ID).
+//  Se distinguen de los repertorios con:  miLista:true · tipo:'lista' · duenoId:<id de la cuenta> · canciones:[ids]
+//  Solo las ve y las edita su dueño (ver mias()). Las pestañas Misas y Eventos no las incluyen (ver visibleRep).
+// =====================================================================
+const stML=document.createElement('style');
+stML.textContent=`.ml-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:14px}
+.ml-card{display:flex;align-items:center;gap:12px;padding:16px;text-align:left;cursor:pointer}
+.ml-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.ml-t b{font-size:15px}.ml-t small{color:var(--gris);font-weight:500}
+.ml-cols{display:grid;grid-template-columns:400px minmax(0,1fr);gap:24px;align-items:start}
+.ml-form{display:grid;gap:14px}
+@media(max-width:960px){.ml-cols{grid-template-columns:minmax(0,1fr)}.ml-cols .hojap{padding:24px 20px;min-height:300px}}
+.ml-form .fl2{margin:0}
+.ml-cuenta{margin:0 0 4px;color:var(--gris);font-weight:600;font-size:13px}
+.ml-fila{display:flex;align-items:center;gap:6px;padding:9px 0;border-bottom:1px solid var(--linea)}
+.ml-fila:last-child{border-bottom:0}
+.ml-n{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}.ml-n b{font-size:14.5px}.ml-n small{color:var(--gris);font-weight:500;font-size:12.5px}
+.ml-sub{margin:6px 0 10px;color:var(--gris);font-size:13.5px}
+button.fila.ml-op{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+.ml-ot{display:flex;flex-direction:column;min-width:0}.ml-ot small{color:var(--gris);font-weight:500;font-size:12.5px}
+button.fila.ml-op.ya{background:var(--oro-claro);color:var(--azul)}
+.ml-ck{flex:none;font-weight:800}
+/* celular: en las cuentas «Usuario» (clase solo-ver, ver base.js) los botones de la barra van centrados, con un «|» entre ellos */
+@media(max-width:760px){body.solo-ver #nav{display:flex;justify-content:center;gap:28px;flex:1 1 auto;min-width:0}
+body.solo-ver #nav a{position:relative}
+body.solo-ver #nav a+a::before{content:'';position:absolute;left:-14px;top:50%;height:60%;width:1px;transform:translateY(-50%);background:currentColor;opacity:.35}}`;
+document.head.append(stML);
+
+const mias=()=>RL.filter(r=>r.miLista&&r.duenoId===yo());
+const actualML=()=>mias().find(r=>r.id===ML);
+const cancionesDeML=r=>ov[r.id]||r.canciones||[];
+const cuentaML=r=>{const n=cancionesDeML(r).length;return n?n+(n>1?' canciones':' canci\u00f3n'):'Sin canciones'};
+const enlaceML=r=>location.origin+location.pathname+'#ver/'+r.id;
+
+// Etiquetas que se ofrecen en «Canción»: las del grupo «Otros». Si todavía no hay ninguna en «Otros» se muestran todas.
+const etiquetasML=()=>{const otros=T.filter(t=>t.grupo==='otro');return otros.length?otros:T};
+const opcionesML=()=>{
+  const l=etiquetasML();
+  if(momento&&!l.some(t=>t.id===momento))momento='';              // esa etiqueta ya no existe
+  return '<option value="">Todas las canciones</option>'+l.map(t=>`<option value="${t.id}"${t.id===momento?' selected':''}>${esc(t.nombre)}</option>`).join('');
+};
+async function nuevaML(){
+  const r=await crear('repertorios',{nombre:'Nueva lista',tipo:'lista',miLista:true,duenoId:yo(),canciones:[],acordes:false,fecha:'',misa:{},secciones:[],textos:{},textosOrd:[]});
+  ML=r.id;editorML();
+}
+function pintarML(){
+  if(!el||!el.isConnected)return;
+  if(ML&&!actualML())ML=null;                                     // la lista se borró
+  if(ML){if($('#ml-ed',el)){const m=$('#ml-m',el);if(m&&document.activeElement!==m)m.innerHTML=opcionesML();pintarCancionesML()}else editorML()}   // también se refrescan las etiquetas si cargaron después
+  else lista();
+}
+function editorML(){
+  const r=actualML();if(!r)return;
+  el.className='';
+  el.innerHTML=`<div id="ml-ed">
+    <div class="ml-cols"><section class="c2 ml-form">
+      <div class="ch2"><button class="sec" data-ml-volver>${ic('lft',16)} Mis listas</button></div>
+      <label class="fl2">Nombre<input id="ml-n" value="${esc(r.nombre||'')}" autocomplete="off"></label>
+      <label class="fl2">Canci\u00f3n<select id="ml-m">${opcionesML()}</select></label>
+      <button data-ml-add>${ic('pls',16)} A\u00f1adir canci\u00f3n</button>
+      <div id="ml-can"></div>
+    </section>
+    <section><div class="ch2"><h2>Vista previa</h2><div class="mb"><button class="sec" data-ml-ver>Abrir</button><button class="ic" data-ml-share aria-label="Compartir" title="Compartir">${ico(SHR,18)}</button></div></div><div class="hojap" id="ml-hoja"></div></section></div></div>`;
+  pintarCancionesML();
+}
+function pintarCancionesML(){
+  const z=$('#ml-can',el),r=actualML();if(!z||!r)return;
+  const filas=cancionesDeML(r).map(id=>{const c=C.find(x=>x.id===id);
+    return c?`<div class="ml-fila"><div class="ml-n"><b>${esc(c.titulo)}</b>${alb(c)?`<small>${esc(alb(c))}</small>`:''}</div><button class="ic" data-ml-quitar="${id}" aria-label="Quitar \u00ab${esc(c.titulo)}\u00bb" title="Quitar">${ic('x',15)}</button></div>`:''}).join('');
+  z.innerHTML=filas?`<p class="ml-cuenta">${cuentaML(r)}</p>${filas}`:'<p class="vacio">Esta lista a\u00fan no tiene canciones.</p>';
+  // Vista previa: solo las canciones (título y letra), sin nombre de la lista, fecha ni etiqueta
+  const h=$('#ml-hoja',el);
+  if(h)h.innerHTML=cancionesDeML(r).map(id=>C.find(x=>x.id===id)).filter(Boolean).map(c=>cancion(c,false,{album:''})).join('')||'<div class="falta">Elige canciones para verlas aqu\u00ed.</div>';
+}
+function ponCancionesML(r,arr){ov[r.id]=arr;guardar('repertorios',r.id,{canciones:arr});pintarCancionesML()}
+
+// Elegir canciones (la ventana sigue abierta para tocar varias)
+function elegirML(){
+  const r=actualML();if(!r)return;
+  const tag=momento,nombreM=(T.find(t=>t.id===tag)||{}).nombre||'Todas las canciones';
+  let q='';
+  const o=modal('<div id="ml-pk"></div>'),z=$('#ml-pk',o);
+  const p=()=>{
+    const k=q.toLowerCase(),ya=cancionesDeML(actualML()||r);
+    const l=C.filter(c=>(!tag||(c.etiquetas||[]).includes(tag))&&c.titulo.toLowerCase().includes(k)).sort((a,b)=>a.titulo.localeCompare(b.titulo));
+    z.innerHTML=`<div class="mh"><h2>A\u00f1adir canci\u00f3n</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
+      <p class="ml-sub">Canci\u00f3n: <b>${esc(nombreM)}</b></p>
+      <input id="ml-q" type="search" placeholder="Buscar canci\u00f3n" aria-label="Buscar canci\u00f3n" value="${esc(q)}" style="width:100%" autocomplete="off">
+      <div class="lista2">${l.map(c=>{const si=ya.includes(c.id);return `<button class="fila ml-op${si?' ya':''}" data-s="${c.id}" aria-pressed="${si}"><span class="ml-ot"><span>${esc(c.titulo)}</span>${alb(c)?`<small>${esc(alb(c))}</small>`:''}</span><span class="ml-ck">${si?'\u2713':''}</span></button>`}).join('')||`<p class="vacio">No hay canciones con esa etiqueta. Cambia \u00abCanci\u00f3n\u00bb a \u00abTodas las canciones\u00bb.</p>`}</div>
+      <div class="barra" style="justify-content:flex-end;margin-top:10px"><button data-cx>Listo</button></div>`;
+  };
+  p();
+  o.onclick=e=>{
+    const b=e.target.closest('button');if(!b)return;
+    if(b.dataset.cx!=null){o.remove();return}
+    if(b.dataset.s){
+      const r2=actualML();if(!r2)return;const ya=cancionesDeML(r2),id=b.dataset.s;
+      const lz=$('.lista2',o),top=lz?lz.scrollTop:0;
+      ponCancionesML(r2,ya.includes(id)?ya.filter(x=>x!==id):[...ya,id]);   // tocar otra vez la quita
+      p();const lz2=$('.lista2',o);if(lz2)lz2.scrollTop=top;
+    }
+  };
+  o.oninput=e=>{if(e.target.id==='ml-q'){q=e.target.value;p();const i=$('#ml-q',o);i.focus();i.setSelectionRange(999,999)}};
+}
+
+// Compartir (mismo método que los repertorios: enlace #ver/ID)
+async function compartirML(){
+  const r=actualML();if(!r)return;
+  if(!cancionesDeML(r).length)return aviso('A\u00f1ade canciones antes de compartir.');
+  const url=enlaceML(r),titulo=r.nombre||'Mi lista';
+  if(matchMedia('(pointer:coarse)').matches&&navigator.share){
+    try{await navigator.share({title:titulo,text:titulo,url});return}
+    catch(e){if(e&&e.name==='AbortError')return}
+  }
+  let copiado=false;
+  try{await navigator.clipboard.writeText(url);copiado=true}catch(e){}
+  window.open(url,'_blank','noopener');
+  aviso(copiado?'Enlace copiado. Ya puedes pegarlo en WhatsApp o en un correo.':'Se abri\u00f3 la lista en una pesta\u00f1a nueva.');
+}
+// nombre y filtro de la lista abierta
+function cambiaML(e){
+  if(e.type!=='change')return;
+  const t=e.target,r=actualML();if(!r)return;
+  if(t.id==='ml-n')guardar('repertorios',r.id,{nombre:t.value.trim()||'Mi lista'});
+  else if(t.id==='ml-m')momento=t.value;
 }

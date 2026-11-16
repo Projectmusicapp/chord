@@ -241,12 +241,13 @@ export const vistas={};
 // menuDe: las secciones de contenido. «Usuarios» (cuentas, nombre/logo, copia de seguridad)
 // no va aquí: se abre como «Configuración» desde el menú de la cuenta, en la cabecera.
 const menuDe=()=>[['calendario','cal','Calendario','Eventos y ensayos'],['repertorio','mus','Repertorio','Misas, eventos y PDF'],['canciones','dsc','Canciones','Letras y acordes'],['escalas','usr','Escalas','Equipos por día']];
-// ===== CHIGO · «Mi lista» para las cuentas «Usuario (solo ver)» =====
-// Esas cuentas solo ven «Mi lista» y «Canciones» en la barra (Inicio sigue en el logo),
-// y no pueden abrir Calendario, Repertorio ni Escalas aunque escriban la dirección.
-const menuUsuario=[['milista','mus','Mi lista','Tus listas de canciones'],['canciones','dsc','Canciones','Letras y acordes']];
+// ===== CHIGO · menú de las cuentas «Usuario» =====
+// Esas cuentas ven «Repertorio» y «Canciones» en la barra (Inicio sigue en el logo).
+// «Mi lista» ya no es una pantalla aparte: es una pestaña dentro de Repertorio, para todos los niveles.
+// No pueden abrir Calendario ni Escalas aunque escriban la dirección.
+const menuUsuario=[['repertorio','mus','Repertorio','Misas, eventos y tu lista'],['canciones','dsc','Canciones','Letras y acordes']];
 const esSoloVer=()=>nivelActivo()==='usuario';
-const BLOQUEADAS_SOLO_VER=['calendario','repertorio','escalas'];
+const BLOQUEADAS_SOLO_VER=['calendario','escalas'];
 // ===== FIN CHIGO =====
 const vista=()=>location.hash.slice(1)||'inicio';
 let vistaAnterior=null,todoCargado=false;
@@ -256,10 +257,11 @@ function irA(){
   const v=vista(),ver=v.startsWith('ver/');            // «ver/ID» = ventana Compartir de un repertorio
   if(!listo&&!ver)return;                               // espera el nombre y el logo guardados (así no aparece el nombre por defecto y luego cambia)
   if(!sesion()&&!ver)return;                            // sin sesión: login.js controla la pantalla, aquí no se toca el menú ni #app
+  if(v==='milista'){try{localStorage.setItem('pestanaRep','milista')}catch(e){}location.hash='repertorio';return}   // enlaces viejos a «Mi lista»: ahora es una pestaña de Repertorio
   if(esSoloVer()&&BLOQUEADAS_SOLO_VER.includes(v)){location.hash='inicio';return}   // Chigo: el usuario (solo ver) no entra a estas pantallas
   document.body.classList.toggle('modo-ver',ver);
   const menu=esSoloVer()?menuUsuario:menuDe();   // Chigo: menú reducido para el usuario (solo ver)
-  document.body.classList.toggle('solo-ver',esSoloVer());   // Chigo: marca el <body> para centrar la barra en el celular (CSS en milista.js)
+  document.body.classList.toggle('solo-ver',esSoloVer());   // Chigo: marca el <body> para centrar la barra en el celular (CSS en repertorio.js)
   $('#nav').innerHTML=ver?'':menu.map(([k,i,n])=>`<a href="#${k}" class="${k===v?'on':''}" ${k===v?'aria-current="page"':''}>${ic(i,18)}<span>${n}</span></a>`).join('');
   const el=$('#app');el.innerHTML='';el.className='';el.dataset.vista=v;
   el.onclick=el.oninput=el.onchange=el.onkeydown=null;   // quita lo que dejó la pantalla anterior

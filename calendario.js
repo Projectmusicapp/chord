@@ -64,7 +64,7 @@ escucharPropio('eventos',l=>{E=l;pCal();if(!form)pPan()});
 escucharPropio('dias',l=>{D=l;pCal();if(!form)pPan()});
 // Los repertorios (ya filtrados por misión) se leen de estado.js en vez de escucharlos por
 // cuenta propia, para no leer la colección dos veces (ver el comentario al principio de ese archivo).
-alCambiar(()=>{R=ED.repertorios;pCal();if(!form)pPan()});   // los llena la Parte 3
+alCambiar(()=>{R=ED.repertorios.filter(r=>!r.miLista&&!r.privado);pCal();if(!form)pPan()});   // sin las «Mi lista» ni los repertorios personales de cuentas «Usuario»   // los llena la Parte 3
 vistas.calendario=e=>{
   el=e;form=null;sel=ymd(new Date());mes=new Date();mes.setDate(1);
   el.innerHTML='<div class="cols"><section class="c2" id="cal" aria-label="Calendario del mes"></section><aside class="c2 pan" id="pan" aria-live="polite"></aside></div>';
