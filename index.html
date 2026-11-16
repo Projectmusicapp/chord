@@ -7,6 +7,10 @@
 <meta name="description" content="Canciones, repertorios, calendario y escalas del ministerio de música.">
 <meta name="theme-color" content="#1F2A4D">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23C58A2B'/%3E%3Cg fill='none' stroke='%231F2A4D' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M25 44V19l20-4v25'/%3E%3Ccircle cx='19' cy='44' r='6'/%3E%3Ccircle cx='39' cy='40' r='6'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Músicapp">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Manrope:wght@500;600;700;800&display=swap">
@@ -20,5 +24,7 @@
 <!-- login.js pide usuario y contraseña y luego carga la app
      (base, canciones, calendario, escalas, repertorio, respaldo) -->
 <script type="module" src="login.js"></script>
+<!-- sw.js: guarda la app en el dispositivo para que abra también sin conexión (ver ese archivo) -->
+<script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));</script>
 </body>
 </html>

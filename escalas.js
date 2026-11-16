@@ -39,41 +39,16 @@ const equipos=()=>['A','B','C','D'].map(x=>({nombre:'Equipo '+x,miembros:[]}));
 const norm=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();   // para buscar sin importar tildes ni mayúsculas
 const ini=n=>(n||'').trim().split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase();
 
-// Ordenar personas dando prioridad a "Voz"
-const ordenarPersonas=(arr)=>{
-  return [...arr].sort((a,b)=>{
-    const ocA=(a.ocupacion||'').trim().toLowerCase();
-    const ocB=(b.ocupacion||'').trim().toLowerCase();
-
-    const aEsVoz=ocA.includes('voz');
-    const bEsVoz=ocB.includes('voz');
-
-    if(aEsVoz && !bEsVoz) return -1;
-    if(!aEsVoz && bEsVoz) return 1;
-
-    if(ocA!==ocB) return ocA.localeCompare(ocB);
-    return a.nombre.localeCompare(b.nombre);
-  });
+// Comparar dos personas dando prioridad a "Voz" (mismo orden en la lista y dentro de cada equipo)
+const cmpPersona=(a,b)=>{
+  const ocA=(a.ocupacion||'').trim().toLowerCase(),ocB=(b.ocupacion||'').trim().toLowerCase();
+  const aEsVoz=ocA.includes('voz'),bEsVoz=ocB.includes('voz');
+  if(aEsVoz!==bEsVoz)return aEsVoz?-1:1;
+  return ocA!==ocB?ocA.localeCompare(ocB):(a.nombre||'').localeCompare(b.nombre||'');
 };
-
+const ordenarPersonas=arr=>[...arr].sort(cmpPersona);
 // Ordenar los miembros de un equipo (Voz primero)
-const ordenarMiembros=(miembrosIds)=>{
-  return [...miembrosIds].sort((idA,idB)=>{
-    const pA=P.find(x=>x.id===idA)||{};
-    const pB=P.find(x=>x.id===idB)||{};
-    const ocA=(pA.ocupacion||'').trim().toLowerCase();
-    const ocB=(pB.ocupacion||'').trim().toLowerCase();
-
-    const aEsVoz=ocA.includes('voz');
-    const bEsVoz=ocB.includes('voz');
-
-    if(aEsVoz && !bEsVoz) return -1;
-    if(!aEsVoz && bEsVoz) return 1;
-
-    if(ocA!==ocB) return ocA.localeCompare(ocB);
-    return (pA.nombre||'').localeCompare(pB.nombre||'');
-  });
-};
+const ordenarMiembros=miembrosIds=>[...miembrosIds].sort((idA,idB)=>cmpPersona(P.find(x=>x.id===idA)||{},P.find(x=>x.id===idB)||{}));
 
 // Los datos (ya filtrados por misi\u00f3n) viven en equipos.js, para no leerlos dos veces:
 // ver el comentario al principio de ese archivo.

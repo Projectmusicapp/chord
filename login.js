@@ -2,8 +2,8 @@
 import {establecerSesion,alCambiarAuth,iniciarSesionAuth,cerrarSesionAuth,enviarVerificacion,recargarUsuarioAuth,escucharDoc,guardar} from "./base.js";
 import {montarMenuUsuario,cargado,sinCuentas,misionesDisponibles,crearPrimerAdmin,autorregistrar} from "./usuarios.js";
 import {selectorBandera,activarSelectores} from "./misiones.js";
+import {svgI as svg} from "./formato.js";
 
-const svg=d=>`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const NOTA='<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>';
 // Recarga la página después de salir: así no queda nada de la sesión anterior pegado en
 // la cabecera (el menú con el nombre, etc.) ni en el estado interno de las pantallas.
@@ -40,7 +40,7 @@ function mostrarLogin() {
   document.title = 'Iniciar sesión · Músicapp';
   const app = document.getElementById('app');
   app.innerHTML = marco(`
-    <div class="marca">${svg(NOTA).replace('width="18" height="18"', 'width="28" height="28"')}</div>
+    <div class="marca">${svg(NOTA,28)}</div>
     <h1>Músicapp</h1>
     <p class="ayuda">Inicia sesión para continuar</p>
     <label>Correo<input name="correo" type="email" autocomplete="email" required></label>
@@ -75,7 +75,7 @@ async function mostrarRegistro() {
   await cargado();
   const misiones = misionesDisponibles();
   app.innerHTML = marco(`
-    <div class="marca">${svg(NOTA).replace('width="18" height="18"', 'width="28" height="28"')}</div>
+    <div class="marca">${svg(NOTA,28)}</div>
     <h1>Crear cuenta</h1>
     <p class="ayuda">Quedas como Usuario (solo ver) de la misión que elijas.</p>
     <label>Nombre<input name="nombre" autocomplete="name" required></label>
@@ -115,7 +115,7 @@ function mostrarPrimerAdmin() {
   document.title = 'Configurar · Músicapp';
   const app = document.getElementById('app');
   app.innerHTML = marco(`
-    <div class="marca">${svg(NOTA).replace('width="18" height="18"', 'width="28" height="28"')}</div>
+    <div class="marca">${svg(NOTA,28)}</div>
     <h1>Primeros pasos</h1>
     <p class="ayuda">Aún no hay ninguna cuenta. Crea la primera: será el Administrador.</p>
     <label>Nombre<input name="nombre" autocomplete="name" required></label>
@@ -144,7 +144,7 @@ function mostrarVerificar(user) {
   document.title = 'Verifica tu correo · Músicapp';
   const app = document.getElementById('app');
   app.innerHTML = marco(`
-    <div class="marca">${svg(NOTA).replace('width="18" height="18"', 'width="28" height="28"')}</div>
+    <div class="marca">${svg(NOTA,28)}</div>
     <h1>Verifica tu correo</h1>
     <p class="ayuda">Te enviamos un enlace a <b>${user.email}</b>. Ábrelo y luego vuelve aquí (revisa también spam/correo no deseado).</p>
     <p class="error" role="alert" hidden></p>

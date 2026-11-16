@@ -1,7 +1,7 @@
 // ===== COPIA DE SEGURIDAD: descargar y restaurar todos los datos =====
 import {$,guardar,escuchar,ic,modal} from "./base.js";
+import {svgI as ico} from "./formato.js";
 
-const ico=(p,s=16)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 const DL='<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>',UP='<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>';
 // Copia completa (sin separar por ministerio): solo para el nivel Administrador.
 const COLS=['config','albumes','canciones','etiquetas','repertorios','personas','escalas','eventos','dias','usuarios'];
@@ -41,7 +41,7 @@ export function ventana(){
   const o=modal(`<div class="mh"><h2>Copia de seguridad</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
     <p style="margin-top:0">Descarga un archivo con todas tus canciones, \u00e1lbumes, etiquetas, repertorios, escalas y eventos. Gu\u00e1rdalo en un lugar seguro (Drive, correo...).</p>
     <p style="color:var(--gris);font-size:13.5px">${u?'\u00daltima copia descargada en este dispositivo: '+new Date(u).toLocaleString('es'):'A\u00fan no has descargado ninguna copia en este dispositivo.'}</p>
-    <div style="display:grid;gap:10px"><button id="dl">${ico(DL)} Descargar copia</button><button class="sec" id="up">${ico(UP)} Restaurar desde un archivo</button><input type="file" id="fi" accept=".json,application/json" hidden></div>
+    <div style="display:grid;gap:10px"><button id="dl">${ico(DL,16)} Descargar copia</button><button class="sec" id="up">${ico(UP,16)} Restaurar desde un archivo</button><input type="file" id="fi" accept=".json,application/json" hidden></div>
     <p id="ms" role="status" style="margin-bottom:0;font-weight:600"></p>`);
   const ms=t=>{$('#ms',o).textContent=t};
   o.onclick=async e=>{

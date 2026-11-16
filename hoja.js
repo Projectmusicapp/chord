@@ -4,6 +4,7 @@
 //  así las dos se ven exactamente igual.
 // =====================================================================
 import {esc} from "./base.js";
+import {plano} from "./formato.js";
 
 const st=document.createElement('style');
 st.textContent=`.hojap{background:#fff;max-width:794px;padding:44px 52px;box-shadow:var(--sombra-2);border-radius:6px;min-height:520px;font-size:16px;line-height:1.35;margin:0 auto;overflow-x:auto}
@@ -36,10 +37,9 @@ export const esPeticiones=n=>String(n||'').trim().toLowerCase()==='peticiones';
 // textosDespues(r,k) devuelve los textos que van después de k (los vacíos solo si todos=true, para el editor).
 export const textosDespues=(r,k,todos)=>(r.textosOrd||[]).filter(id=>r.textos&&r.textos[id]).map(id=>({id,...r.textos[id]})).filter(t=>t.despues===k&&(todos||(t.titulo||'').trim()||(t.texto||'').trim()));
 // Cada texto guarda sus líneas {r:[tramos]} (mismo modelo que las canciones) y su tipo de letra. Los textos antiguos solo tienen «texto» simple.
-const planoL=l=>l.r.map(x=>x.t).join('');
 export const lineasTx=t=>t&&t.lineas&&t.lineas.length?t.lineas:String((t&&t.texto)||'').split('\n').map(s=>({r:s?[{t:s}]:[]}));
 export const lineasTxHtml=ls=>ls.map(l=>`<div class="tl" style="font-size:${l.s||16}px;${l.a?'text-align:'+l.a+';':''}${l.n?'padding-left:'+l.n*28+'px;':''}">${l.r.map(x=>`<span style="${est(x)}">${esc(x.t)}</span>`).join('')||'<br>'}</div>`).join('');
-export const textoHtml=t=>{const ls=lineasTx(t),f=fcss(t&&t.fuente);return ls.some(l=>planoL(l).trim())?`<div class="sg"><div class="txn" style="${f?'font-family:'+esc(f)+';':''}">${lineasTxHtml(ls)}</div></div>`:''};
+export const textoHtml=t=>{const ls=lineasTx(t),f=fcss(t&&t.fuente);return ls.some(l=>plano(l).trim())?`<div class="sg"><div class="txn" style="${f?'font-family:'+esc(f)+';':''}">${lineasTxHtml(ls)}</div></div>`:''};
 
 function hojaAcordes(c,o){
   const f=fcss(c.fuenteA),tono=c.tonoAct||c.tono;
