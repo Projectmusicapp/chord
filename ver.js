@@ -7,8 +7,9 @@
 //   - en cada canción, «Tono: X» se puede tocar para transponer esa canción
 //   - en los eventos, junto a cada sección, un botón para ver su escala (equipo)
 //   - en el celular, la barra de arriba se oculta al bajar y vuelve al subir
+//   - un botón «Auto» junto a «Acordes»: abre un panel (play/pausa y velocidad) que baja la hoja sola, para cantar o tocar sin tocar la pantalla
 //
-//  IMPORTANTE: todo lo que se cambia aquí (acordes, tonos, zoom) vive solo
+//  IMPORTANTE: todo lo que se cambia aquí (acordes, tonos, zoom, velocidad del desplazamiento) vive solo
 //  en la pantalla de quien lo toca. No se guarda en Firebase, no cambia la
 //  canción ni su editor, y al recargar o cerrar vuelve a como estaba.
 //
@@ -18,6 +19,7 @@
 //   3. TRANSPONER ........ copia de la canción con los acordes movidos
 //   4. DIBUJAR ........... barra de arriba, hoja y panel de tono
 //   5. EVENTOS ........... clics, teclas y zoom con dos dedos
+//   6. DESPLAZAMIENTO AUTOMÁTICO ... botón «Auto», panel de velocidad y la hoja que baja sola
 // =====================================================================
 import {$,esc,escucharDoc,vistas} from "./base.js";
 import {MOM,fechaLarga,cancion,textoHtml,textosDespues,esPeticiones} from "./hoja.js";
@@ -78,7 +80,16 @@ st.textContent=`.modo-ver header,.modo-ver #nav{display:none!important}
   .tpan .keys2 button{min-height:40px}
   .tpan.epan{left:10px;right:10px}
 }
-@media print{.vbar,.tdd{display:none!important}.vzona{padding:0}.vzona .hojap{box-shadow:none;padding:0}}`;
+.vbar .vauto{position:relative;flex:none}
+.vbar .vauto-b{gap:6px}
+.vapan{position:absolute;top:calc(100% + 10px);right:0;z-index:7;display:flex;align-items:center;gap:12px;width:min(360px,calc(100vw - 20px));background:var(--blanco);border:1px solid var(--linea);border-radius:999px;box-shadow:var(--sombra-2);padding:6px 18px 6px 6px;font-family:var(--fuente)}
+.vapan[hidden]{display:none}
+.vapan .vplay{flex:none;width:46px;height:46px;min-height:0;padding:0;border-radius:50%;display:grid;place-items:center}
+.vapan .vplay[aria-pressed=false]{background:var(--suave);color:var(--azul)}
+.vapan .vvel{flex:1;min-width:0;display:flex;flex-direction:column;gap:0;margin:0}
+.vapan .et{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;color:var(--gris)}
+.vapan input[type=range]{width:100%;height:26px;margin:0;padding:0;border:0;background:transparent;accent-color:var(--azul);touch-action:pan-x}
+@media print{.vbar,.tdd,.vauto{display:none!important}.vzona{padding:0}.vzona .hojap{box-shadow:none;padding:0}}`;
 document.head.append(st);
 
 // ---------- 2. DATOS (solo lectura) ----------
@@ -114,7 +125,7 @@ const albDe=c=>(A[c.albumId]||{}).nombre||'';   // nombre del álbum de una canc
 
 vistas.ver=(e,rid)=>{
   if(id!==rid){
-    id=rid;local.acordes=null;local.tonos={};local.abierto=null;local.zoom=1;local.manual=false;
+    id=rid;local.acordes=null;local.tonos={};local.abierto=null;local.zoom=1;local.manual=false;parar();cerrarPanel();
     if(dejarRep)dejarRep();
     R=null;repCargado=false;C={};A={};
     suscC.forEach(dejar=>dejar());suscC.clear();
@@ -124,7 +135,7 @@ vistas.ver=(e,rid)=>{
   el=e;el.onclick=clic;el.onkeydown=tecla;
   pintar();
 };
-addEventListener('hashchange',()=>{if(!location.hash.startsWith('#ver/'))el=null});
+addEventListener('hashchange',()=>{if(!location.hash.startsWith('#ver/')){el=null;parar();cerrarPanel()}});
 
 // ---------- 3. TRANSPONER ----------
 const pick=r=>{const o={};for(const k in r)if(k!=='t'&&r[k]!=null)o[k]=r[k];return o};
@@ -203,7 +214,7 @@ function pintar(){
   if(!el)return;
   if(!repCargado){el.innerHTML='<div class="vmsg"><p>Cargando repertorio…</p></div>';return}
   const r=R;
-  if(!r){document.title='Repertorio no encontrado';el.innerHTML='<div class="vmsg"><h1>No encontramos este repertorio</h1><p>Puede que lo hayan eliminado o que el enlace esté incompleto. Pide a quien te lo envió que lo comparta otra vez.</p></div>';return}
+  if(!r){parar();document.title='Repertorio no encontrado';el.innerHTML='<div class="vmsg"><h1>No encontramos este repertorio</h1><p>Puede que lo hayan eliminado o que el enlace esté incompleto. Pide a quien te lo envió que lo comparta otra vez.</p></div>';return}
   document.title=(r.nombre||'Repertorio')+(r.fecha?' · '+fechaLarga(r.fecha):'');
   if(local.acordes===null)local.acordes=!!r.acordes;
   const ac=local.acordes;
@@ -225,7 +236,7 @@ function pintar(){
   el.innerHTML=`<div class="vbar${barraOculta?' oculta':''}"><div class="vt2"><h1>${esc(r.nombre||'Repertorio')}</h1>${r.fecha?`<small>${esc(fechaLarga(r.fecha))}</small>`:''}</div>
       <button class="vac2" data-acordes aria-pressed="${ac}"><span class="vchk2">${ac?svg('<path d="M20 6L9 17l-5-5"/>',12):''}</span>Acordes</button></div>
         <div class="vzona"><div class="hojap${ac?' conac':''}" id="vh" style="zoom:${local.zoom}">${hoja}</div></div>${cuadro}`;
-  ajustar();zoomTactil();
+  ajustar();zoomTactil();ponerAuto();
 }
 
 // ---------- 5. EVENTOS ----------
@@ -260,6 +271,11 @@ let ultimoY=0;
 addEventListener('scroll',()=>{
   if(!el||!location.hash.startsWith('#ver/'))return;
   const y=scrollY,barra=el.querySelector('.vbar');
+  if(auto.on){   // con el desplazamiento activo, la barra NO se oculta por bajar (eso lo hace el temporizador de 3 s); solo reaparece si subes
+    if(barraOculta&&y<ultimoY-8)mostrarBarra();
+    if(Math.abs(y-ultimoY)>8)ultimoY=y;
+    return;
+  }
   let oculta=barraOculta;
   if(!matchMedia('(max-width:760px)').matches||y<60)oculta=false;
   else if(y>ultimoY+8)oculta=true;
@@ -304,3 +320,120 @@ function zoomTactil(){
   };
   h.ontouchend=e=>{if(e.touches.length<2)distInicial=0};
 }
+
+// ---------- 6. DESPLAZAMIENTO AUTOMÁTICO ----------
+// El botón «Auto» (junto a «Acordes», en la barra de arriba) abre un panel con play/pausa y la barra de velocidad.
+// Con el play activo la hoja baja sola a la velocidad elegida.
+//  - A los 3 segundos de darle play, el panel se cierra y la barra de arriba se oculta (en el celular) para que se vean las letras.
+//    Si subes la hoja con el dedo, la barra vuelve y a los 3 segundos se oculta otra vez. Tocar el botón o el panel reinicia esos 3 segundos,
+//    y no se ocultan mientras tienes el dedo sobre el panel o sobre la hoja.
+//  - Tocar el botón otra vez, o en cualquier otro lado, cierra el panel (el desplazamiento sigue).
+//  - Mientras el dedo está sobre la hoja (subir, bajar, zoom) se pausa y sigue al soltar. También se pausa con un cuadro de tono o de escala abierto.
+//  - Al llegar al final se detiene solo, y la barra vuelve a aparecer.
+//  - Con el desplazamiento activo se pide que la pantalla no se apague (si el aparato lo permite).
+// El botón y el panel se crean UNA vez y se vuelven a poner en la barra cada vez que la pantalla se redibuja (ponerAuto),
+// así un cambio en el repertorio no cierra el panel ni le quita el dedo a la barra de velocidad.
+// La velocidad solo vive en esta pantalla (como todo lo demás aquí): al recargar vuelve a la de inicio.
+const auto={on:false,v:40,panel:false,tocando:false,dedoEnPanel:false,acum:0,ultimo:0,raf:0,luz:null,tOcultar:0};
+const pxPorSeg=v=>2*Math.pow(30,v/100);     // la barra va de 0 a 100: 2 px por segundo (muy lento) hasta 60 px por segundo (rápido)
+const ESPERA_OCULTAR=3000;                    // milisegundos antes de ocultar el panel y la barra
+let caja=null;
+const ICO_PLAY='<polygon points="7 4 20 12 7 20 7 4" fill="currentColor"/>',ICO_PAUSA='<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/>';
+const ICO_AUTO='<path d="M12 4v16M8 8l4-4 4 4M8 16l4 4 4-4"/>';   // una sola flecha que apunta arriba y abajo
+function crearControl(){
+  if(caja)return caja;
+  caja=document.createElement('div');caja.className='vauto';
+  caja.innerHTML=`<button type="button" class="vac2 vauto-b" data-auto aria-pressed="false" aria-expanded="false" aria-haspopup="true" aria-label="Desplazamiento automático">${svg(ICO_AUTO,16)}<span>Auto</span></button>
+    <div class="vapan" role="group" aria-label="Desplazamiento automático" hidden><button type="button" class="vplay" data-play></button>
+      <label class="vvel"><span class="et"><span>Lento</span><span>Velocidad</span><span>Rápido</span></span><input type="range" min="0" max="100" step="1" value="${auto.v}" aria-label="Velocidad del desplazamiento automático"></label></div>`;
+  caja.addEventListener('click',e=>{
+    if(e.target.closest('[data-auto]'))alternarPanel();
+    else if(e.target.closest('[data-play]'))auto.on?parar():arrancar();
+  });
+  caja.addEventListener('input',e=>{if(e.target.type==='range'){auto.v=+e.target.value;programarOcultar()}});
+  caja.addEventListener('pointerdown',()=>{auto.dedoEnPanel=true;programarOcultar()});
+  const suelta=()=>{if(auto.dedoEnPanel){auto.dedoEnPanel=false;programarOcultar()}};
+  caja.addEventListener('pointerup',suelta);caja.addEventListener('pointercancel',suelta);
+  document.addEventListener('pointerup',suelta);document.addEventListener('pointercancel',suelta);   // por si el dedo se suelta fuera del panel
+  document.addEventListener('click',e=>{if(auto.panel&&!caja.contains(e.target))cerrarPanel()});         // tocar en cualquier otro lado cierra el panel
+  pintarAuto();
+  return caja;
+}
+// ponerAuto: pone el botón (con su panel) en la barra de arriba, a la derecha de «Acordes»
+function ponerAuto(){const b=el&&el.querySelector('.vbar');if(b)b.append(crearControl())}
+function pintarAuto(){
+  if(!caja)return;
+  const p=caja.querySelector('[data-play]'),b=caja.querySelector('[data-auto]'),panel=caja.querySelector('.vapan');
+  p.setAttribute('aria-pressed',String(auto.on));
+  p.setAttribute('aria-label',auto.on?'Pausar el desplazamiento automático':'Activar el desplazamiento automático');
+  p.title=auto.on?'Pausar':'Play';
+  p.innerHTML=svg(auto.on?ICO_PAUSA:ICO_PLAY,22);
+  b.setAttribute('aria-pressed',String(auto.on));                // igual que «Acordes»: se ve «encendido» mientras baja
+  b.setAttribute('aria-expanded',String(auto.panel));
+  panel.hidden=!auto.panel;
+}
+function alternarPanel(){auto.panel=!auto.panel;pintarAuto();programarOcultar()}
+function cerrarPanel(){if(!auto.panel)return;auto.panel=false;pintarAuto()}
+// La barra de arriba solo se oculta en el celular (en computadora se queda como estaba)
+function fijarBarra(oculta){
+  if(oculta&&!matchMedia('(max-width:760px)').matches)return;
+  barraOculta=oculta;
+  const b=el&&el.querySelector('.vbar');if(b)b.classList.toggle('oculta',oculta);
+}
+function mostrarBarra(){fijarBarra(false);programarOcultar()}
+// programarOcultar: (re)inicia los 3 segundos. Solo con el play activo. Al cumplirse cierra el panel y oculta la barra,
+// salvo que haya un dedo sobre el panel o sobre la hoja: entonces espera otros 3 segundos.
+function programarOcultar(){
+  clearTimeout(auto.tOcultar);auto.tOcultar=0;
+  if(!auto.on)return;
+  auto.tOcultar=setTimeout(()=>{
+    auto.tOcultar=0;
+    if(!auto.on)return;
+    if(auto.dedoEnPanel||auto.tocando){programarOcultar();return}
+    cerrarPanel();fijarBarra(true);
+  },ESPERA_OCULTAR);
+}
+function arrancar(){
+  if(auto.on)return;
+  auto.on=true;auto.acum=0;auto.ultimo=0;pintarAuto();
+  pedirLuz();
+  programarOcultar();
+  auto.raf=requestAnimationFrame(pasoAuto);
+}
+function parar(){
+  clearTimeout(auto.tOcultar);auto.tOcultar=0;
+  if(!auto.on&&!auto.raf)return;
+  auto.on=false;cancelAnimationFrame(auto.raf);auto.raf=0;soltarLuz();
+  fijarBarra(false);pintarAuto();                                // al detenerse, la barra vuelve a verse
+}
+function pasoAuto(t){
+  if(!auto.on)return;
+  const dt=auto.ultimo?Math.min(t-auto.ultimo,100)/1000:0;     // si la pestaña estuvo en segundo plano, no da un salto
+  auto.ultimo=t;
+  if(!auto.tocando&&!local.abierto){
+    auto.acum+=pxPorSeg(auto.v)*dt;
+    const n=Math.floor(auto.acum);                              // la pantalla solo se mueve de a píxeles enteros: lo que sobra se acumula
+    if(n>=1){
+      auto.acum-=n;
+      try{scrollBy({top:n,left:0,behavior:'instant'})}catch(e){scrollBy(0,n)}
+      if(scrollY+innerHeight>=document.documentElement.scrollHeight-1){parar();return}   // llegó al final
+    }
+  }
+  auto.raf=requestAnimationFrame(pasoAuto);
+}
+// Mientras el dedo está sobre la hoja se pausa (así se puede subir, bajar o hacer zoom); al soltar, sigue.
+addEventListener('touchstart',e=>{if(auto.on&&!(e.target.closest&&e.target.closest('.vauto')))auto.tocando=true},{passive:true});
+const sueltaDedo=e=>{if(!e.touches||e.touches.length===0){if(auto.tocando)programarOcultar();auto.tocando=false;auto.ultimo=0}};
+addEventListener('touchend',sueltaDedo,{passive:true});
+addEventListener('touchcancel',sueltaDedo,{passive:true});
+// Que la pantalla no se apague mientras baja (no todos los aparatos lo permiten; si falla, no pasa nada)
+async function pedirLuz(){
+  try{
+    if(!navigator.wakeLock||auto.luz)return;
+    const l=await navigator.wakeLock.request('screen');
+    if(!auto.on){l.release();return}
+    auto.luz=l;l.addEventListener('release',()=>{if(auto.luz===l)auto.luz=null});
+  }catch(e){}
+}
+function soltarLuz(){try{if(auto.luz)auto.luz.release()}catch(e){}auto.luz=null}
+document.addEventListener('visibilitychange',()=>{if(auto.on&&document.visibilityState==='visible')pedirLuz()});   // al volver a la pestaña se vuelve a pedir
