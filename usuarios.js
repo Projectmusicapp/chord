@@ -714,6 +714,18 @@ function tiempoRelativo(ms){
   const anio=Math.round(mes/12);return `hace ${anio} año${anio===1?'':'s'}`;
 }
 
+// Las novedades de canciones duran 5 días y luego desaparecen solas.
+const DIAS_NOVEDAD=5;
+// eventoCancion: qué se le muestra a una canción en Novedades y desde cuándo.
+//   creadoEn (la crea crear()) · acordesEn (primera vez que se le añaden acordes) · editadoEn (cualquier otro cambio guardado; los pone editor.js)
+//   Gana el más reciente: «Editado» > «Acordes añadidos» > «Nueva canción».
+function eventoCancion(c){
+  const n=c.creadoEn||0,a=c.acordesEn||0,e=c.editadoEn||0;
+  if(e&&e>=a&&e>=n)return {texto:'Editado',cuando:e};
+  if(a&&a>=n)return {texto:'Acordes añadidos',cuando:a};
+  return {texto:'Nueva canción',cuando:n};
+}
+
 function novedades(){
   const actor=sesion();if(!actor)return [];
   const cuentas=cuentasVisibles(actor).filter(u=>u.id!==actor.id).map(u=>({
@@ -722,12 +734,17 @@ function novedades(){
     titulo:u.nombre||u.correo,
     sub:descripcionRoles(u)
   }));
-  const canciones=E.canciones.map(c=>({
-    tipo:'cancion',
-    creadoEn:c.creadoEn||0,
-    titulo:c.titulo,
-    sub:['Canción',(E.albumes.find(a=>a.id===c.albumId)||{}).nombre].filter(Boolean).join(' · ')
-  }));
+  const limite=Date.now()-DIAS_NOVEDAD*24*60*60*1000;
+  const canciones=E.canciones.map(c=>{
+    const ev=eventoCancion(c),alb=E.albumes.find(a=>a.id===c.albumId)||{};
+    return {
+      tipo:'cancion',
+      creadoEn:ev.cuando,                                  // (es la fecha del evento: sirve para ordenar y para «hace X»)
+      titulo:c.titulo,
+      sub:[ev.texto,alb.nombre].filter(Boolean).join(' · '),
+      foto:alb.foto||''                                    // la foto del álbum de la canción
+    };
+  }).filter(x=>x.creadoEn>=limite);
   return [...cuentas,...canciones].sort((a,b)=>b.creadoEn-a.creadoEn).slice(0,6);
 }
 
@@ -739,7 +756,8 @@ function pintarInicio(){
   const iconoDe=tipo=>tipo==='cancion'?ic('mus',18):ic('usr',18);
   const filaNovedad=it=>{
     const cuando=tiempoRelativo(it.creadoEn);
-    return `<div class="ufila"><span class="nic ${it.tipo}">${iconoDe(it.tipo)}</span><div class="un"><b>${esc(it.titulo)}</b>${it.sub?`<small>${esc(it.sub)}</small>`:''}</div>${cuando?`<span class="cuando">${esc(cuando)}</span>`:''}</div>`;
+    const estiloFoto=it.foto?` style="background:url('${esc(it.foto)}') center/cover no-repeat"`:'';   // con foto de álbum: la foto en lugar del ícono
+    return `<div class="ufila"><span class="nic ${it.tipo}"${estiloFoto}>${it.foto?'':iconoDe(it.tipo)}</span><div class="un"><b>${esc(it.titulo)}</b>${it.sub?`<small>${esc(it.sub)}</small>`:''}</div>${cuando?`<span class="cuando">${esc(cuando)}</span>`:''}</div>`;
   };
   wrap.innerHTML=`<div class="bienvenida">
       <div><h1>Hola, ${esc(actor.nombre||actor.correo)}</h1><p>${hoyLargo()}</p></div>
