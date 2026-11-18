@@ -15,7 +15,7 @@
 //
 //  MAPA:
 //   1. ESTILOS
-//   2. DATOS ............. repertorio y canciones (solo lectura)
+//   2. DATOS ............. repertorio, canciones y escalas (solo lectura)
 //   3. TRANSPONER ........ copia de la canción con los acordes movidos
 //   4. DIBUJAR ........... barra de arriba, hoja y panel de tono
 //   5. EVENTOS ........... clics, teclas y zoom con dos dedos
@@ -23,7 +23,6 @@
 // =====================================================================
 import {$,esc,escucharDoc,vistas} from "./base.js";
 import {MOM,fechaLarga,cancion,textoHtml,textosDespues,esPeticiones} from "./hoja.js";
-import {textoEquipo,htmlMiembros,alCambiarEquipos} from "./equipos.js";
 import {MAY,MEN,usaSostenidos,tokensAcorde,transponerChars,raizTono,esMenor,nombreTono,ix} from "./musica.js";
 import {svgI as svg} from "./formato.js";
 
@@ -97,12 +96,14 @@ document.head.append(st);
 // las colecciones ENTERAS de repertorios/canciones/álbumes solo para mostrar un repertorio puntual
 // (y cualquiera puede abrir un enlace muchas veces, sin login). Ahora solo se pide ese repertorio
 // y las canciones/álbumes que de verdad usa, con un documento suelto por cada uno.
-let R=null,repCargado=false,C={},A={},el=null,id=null,dejarRep=null;
-const suscC=new Map(),suscA=new Map();   // id de documento -> función para dejar de escucharlo
+// Con las escalas pasa lo mismo: equipos.js las lee con escucharPropio, que solo deja pasar lo del
+// espacio general (aquí no hay sesión, así que no hay espacio), y se perdían las escalas de una misión.
+// Por eso aquí se lee directamente el día de cada escala elegida y las personas de ese equipo.
+let R=null,repCargado=false,C={},A={},ED={},PD={},el=null,id=null,dejarRep=null;   // ED: días de Escalas · PD: personas
+const suscC=new Map(),suscA=new Map(),suscE=new Map(),suscP=new Map();   // id de documento -> función para dejar de escucharlo
 // Lo que cambia cada persona en su pantalla. Se pierde al recargar (a propósito).
 const local={acordes:null,tonos:{},abierto:null,zoom:1,manual:false};
 let barraOculta=false;
-alCambiarEquipos(()=>pintar());
 
 // idsCancionesDe(r): los ids de canciones que de verdad usa este repertorio (sin repetir).
 function idsCancionesDe(r){
@@ -123,14 +124,54 @@ function sincronizaCanciones(){sincroniza(C,suscC,idsCancionesDe(R),'canciones',
 function sincronizaAlbumes(){sincroniza(A,suscA,[...new Set(Object.values(C).map(c=>c.albumId).filter(Boolean))],'albumes',()=>{})}
 const albDe=c=>(A[c.albumId]||{}).nombre||'';   // nombre del álbum de una canción
 
+// ----- Escalas: una escala elegida se guarda así: {dia:'id del día', eq:0, nombre:'Equipo A'} (ver equipos.js) -----
+// seleccionesDe(r): las escalas elegidas en el repertorio (solo en los eventos, una por sección)
+const seleccionesDe=r=>r&&r.tipo==='evento'?(r.secciones||[]).map(s=>s.escala).filter(s=>s&&s.dia):[];
+// equipoCrudo(sel): el día y el equipo con los datos actuales (o null). Misma búsqueda que equipos.js:
+// por posición y, si cambiaron el orden de los equipos, por nombre.
+function equipoCrudo(sel){
+  if(!sel||!sel.dia)return null;
+  const d=ED[sel.dia];if(!d)return null;
+  const eqs=d.equipos||[];
+  let q=eqs[sel.eq];
+  if(!q||(sel.nombre&&q.nombre!==sel.nombre))q=eqs.find(e=>e.nombre===sel.nombre)||q;
+  return q?{d,q}:null;
+}
+// Mismo orden que en Escalas: primero «Voz», luego por ocupación y nombre
+const oc=p=>(p.ocupacion||'').trim().toLowerCase();
+const ordenarPers=ids=>ids.map(i=>PD[i]).filter(Boolean).sort((a,b)=>{
+  const va=oc(a).includes('voz'),vb=oc(b).includes('voz');
+  if(va!==vb)return va?-1:1;
+  return oc(a).localeCompare(oc(b))||(a.nombre||'').localeCompare(b.nombre||'');
+});
+function equipoDe(sel){const x=equipoCrudo(sel);return x?{dia:x.d.nombre,equipo:x.q.nombre,miembros:ordenarPers(x.q.miembros||[])}:null}
+const textoEquipo=sel=>{const e=equipoDe(sel);return e?e.dia+' · '+e.equipo:''};
+function htmlMiembros(sel){
+  const e=equipoDe(sel);
+  if(!e)return '<p class="vac" style="margin:0">La escala elegida ya no existe en Escalas.</p>';
+  return e.miembros.length?`<ul class="miembros">${e.miembros.map(p=>`<li><span>${esc(p.nombre)}</span><small>${esc(p.ocupacion||'')}</small></li>`).join('')}</ul>`:'<p class="vac" style="margin:0">Este equipo aún no tiene personas.</p>';
+}
+// Los estilos de la lista de integrantes vivían en equipos.js; ahora están aquí (esta pantalla ya no lo carga)
+const stE=document.createElement('style');
+stE.textContent=`.miembros{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.miembros li{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--linea)}
+.miembros li:last-child{border-bottom:0}
+.miembros small{color:var(--gris)}`;
+document.head.append(stE);
+// Se escuchan solo los días de las escalas elegidas y, de ahí, solo las personas de esos equipos
+function sincronizaEscalas(){sincroniza(ED,suscE,[...new Set(seleccionesDe(R).map(s=>s.dia))],'escalas',sincronizaPersonas)}
+function sincronizaPersonas(){sincroniza(PD,suscP,[...new Set(seleccionesDe(R).flatMap(s=>{const x=equipoCrudo(s);return x?(x.q.miembros||[]):[]}))],'personas',()=>{})}
+
 vistas.ver=(e,rid)=>{
   if(id!==rid){
     id=rid;local.acordes=null;local.tonos={};local.abierto=null;local.zoom=1;local.manual=false;parar();cerrarPanel();
     if(dejarRep)dejarRep();
-    R=null;repCargado=false;C={};A={};
+    R=null;repCargado=false;C={};A={};ED={};PD={};
     suscC.forEach(dejar=>dejar());suscC.clear();
     suscA.forEach(dejar=>dejar());suscA.clear();
-    dejarRep=escucharDoc('repertorios',rid,r=>{R=r;repCargado=true;sincronizaCanciones();pintar()});
+    suscE.forEach(dejar=>dejar());suscE.clear();
+    suscP.forEach(dejar=>dejar());suscP.clear();
+    dejarRep=escucharDoc('repertorios',rid,r=>{R=r;repCargado=true;sincronizaCanciones();sincronizaEscalas();pintar()});
   }
   el=e;el.onclick=clic;el.onkeydown=tecla;
   pintar();
