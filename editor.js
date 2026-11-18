@@ -134,6 +134,7 @@ const armar=(l,chars)=>{
 };
 const mapaCp=t=>{const m=[];let cp=0;for(let i=0;i<t.length;){const w=t.codePointAt(i)>0xFFFF?2:1;for(let k=0;k<w;k++)m[i+k]=cp;i+=w;cp++}return m};   // posición en unidades UTF-16 → posición en letras (emojis cuentan 1)
 const recorta=ls=>{const o=[...ls];while(o.length>1&&!o[o.length-1].r.length)o.pop();return o};   // quita líneas vacías del final
+const tieneAc=ls=>(ls||[]).some(l=>l.r.some(r=>r.k));   // ¿la hoja tiene al menos una letra marcada como acorde (botón «Ac»)? Lo usa «Novedades» de Inicio
 
 // ---------- LA FUNCIÓN PRINCIPAL ----------
 export function abrir(s,alCerrar,opc={}){
@@ -145,7 +146,7 @@ export function abrir(s,alCerrar,opc={}){
   ed.albumId=ed.albumId||A[0]?.id;
   ed.lineas=structuredClone(s.lineas||(s.letra||'').split('\n').map(t=>({r:t?[{t}]:[]}))).map(l=>armar(l,aChars(l)));
   if(!ed.ac){ed.ac={};for(const l in ed.acordes){let f='';[...ed.acordes[l]].sort((a,b)=>a.i-b.i).forEach(a=>{f=f.padEnd(a.i,' ')+(f.length>a.i?' ':'')+a.c});ed.ac[l]=f}}
-  let modo='letra',verEt=false,eq='',rango=null,rangoCol=null,modoAcorde=false,pincel=null,pend=null,zoom=100,plegada=false,popAb=null,uc='#B3261E',uh='#FFF176',ancla=null,inicial='',base='';
+  let modo='letra',verEt=false,eq='',rango=null,rangoCol=null,modoAcorde=false,pincel=null,pend=null,zoom=100,plegada=false,popAb=null,uc='#B3261E',uh='#FFF176',ancla=null,inicial='',base='',teniaAcordes=false;
   // rango: la última selección hecha dentro de la hoja (con o sin texto). pend: formato «pendiente» para lo que escribas sin selección.
   const ov=document.createElement('div');ov.id='editor';ov.className='ed';document.body.append(ov);
   const nom=i=>T.find(t=>t.id===i)?.nombre||'';
@@ -768,8 +769,16 @@ export function abrir(s,alCerrar,opc={}){
     if(t.id==='ok'){
       if(soloLectura)return;
       if(!ed.titulo.trim())return alert('Escribe un t\u00edtulo.');
+      const cambio=snapFull()!==inicial;                     // ¿cambió algo de verdad desde que se abrió?
       ed.lineas=recorta(ed.lineas);ed.lineasA=recorta(ed.lineasA);
       ed.letra=ed.lineas.map(plano).join('\n');
+      // Fechas para «Novedades» (Inicio). Una canción nueva solo lleva «creadoEn» (la pone crear()).
+      // En una canción que ya existe: la primera vez que se le añaden acordes se guarda «acordesEn»;
+      // cualquier otro cambio guarda «editadoEn». Si no cambió nada, no se guarda ninguna fecha.
+      if(ed.id){
+        if(!teniaAcordes&&tieneAc(ed.lineasA)&&!ed.acordesEn)ed.acordesEn=Date.now();
+        else if(cambio)ed.editadoEn=Date.now();
+      }
       const {id,acordes,...x}=ed;id?guardar('canciones',id,x,false):crear('canciones',x);cerrar();return}
     if(t.id==='no'){if(!soloLectura&&snapFull()!==inicial&&!confirm('\u00bfDescartar los cambios?'))return;return cerrar()}
     if(d.tt!=null){cambiaTono(+d.tt);return}
@@ -799,5 +808,6 @@ export function abrir(s,alCerrar,opc={}){
   // Las DOS hojas se pasan por el mismo lector antes de guardar la «foto inicial»; así «Cancelar» solo pregunta si de verdad cambiaste algo.
   const normaliza=ls=>{const d=document.createElement('div');d.innerHTML=hojaHtml(ls);return leerDom(d)};
   ed.lineas=normaliza(ed.lineas);ed.lineasA=normaliza(ed.lineasA);
+  teniaAcordes=tieneAc(ed.lineasA);                          // ¿ya tenía acordes al abrir? (para «Novedades»: «Acordes añadidos» solo la primera vez)
   pinta();inicial=snapFull();base=snap();
 }
