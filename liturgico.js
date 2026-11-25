@@ -25,7 +25,7 @@
 //     o Pascua, gana el domingo y la solemnidad queda anotada debajo).
 //   · Epifanía el 6 de enero; Ascensión y Corpus Christi en jueves.
 //   · En Cuaresma y del 17 al 24 de diciembre las memorias obligatorias pasan a libres.
-//   · Los colores litúrgicos se añadirán más adelante.
+//   · Colores litúrgicos: verde, morado, blanco, rojo y rosa (Gaudete y Laetare); ver COLORES y colorSanto().
 // =====================================================================
 import {esc,ambitoActual} from "./base.js";
 import {misionPorId,alCambiarMisiones} from "./misiones.js";
@@ -101,77 +101,99 @@ function datosAnio(Y){
 
 // ---------------------------------------------------------------------
 // 3. TIEMPO LITÚRGICO
-//    temporal(fecha) → {tiempo, semana, nombre, domingo, p, bajar}
+//    temporal(fecha) → {tiempo, semana, nombre, corto, color, domingo, p, bajar}
+//      nombre = nombre completo del día («Lunes de la 1.ª semana de Adviento»)
+//      corto  = título breve para mostrar junto al tiempo y la semana, sin repetirlos
+//               («1.er domingo»); null = no lleva título (una feria común: basta el tiempo y la semana)
 //      p = prioridad (menor gana): 1 días mayores (Triduo, domingos de Adviento/Cuaresma/Pascua…)
 //          3 fiesta del Señor · 3.5 domingo de Navidad/Ordinario · 4.5 feria de Cuaresma o del 17-24 dic
 //          5.5 feria común
 //      bajar = en este día las memorias obligatorias pasan a libres
 // ---------------------------------------------------------------------
+// Colores litúrgicos. «hex» es el color del punto; «borde» el contorno (el blanco lleva borde dorado para verse sobre fondo claro).
+export const COLORES={
+  verde:{nombre:'Verde',hex:'#2E7D4F',borde:'#2E7D4F'},
+  morado:{nombre:'Morado',hex:'#6A3FA0',borde:'#6A3FA0'},
+  blanco:{nombre:'Blanco',hex:'#FFFFFF',borde:'#B9A24B'},
+  rojo:{nombre:'Rojo',hex:'#B3261E',borde:'#B3261E'},
+  rosa:{nombre:'Rosa',hex:'#E48CB0',borde:'#E48CB0'}
+};
+// Color de una celebración de santos o del Señor, según su nombre:
+// rojo = mártires, apóstoles, evangelistas, la Cruz · morado = Fieles Difuntos · blanco = todo lo demás.
+function colorSanto(n){
+  if(/^Conmemoración de todos los fieles difuntos/.test(n))return 'morado';
+  if(/^San Juan, apóstol|Cátedra|Conversión/.test(n))return 'blanco';
+  if(/mártir|[Aa]póstol|evangelista|Martirio|Exaltación de la Santa Cruz/.test(n))return 'rojo';
+  return 'blanco';
+}
+
 function temporal(d){
   const Y=d.getFullYear(),A=datosAnio(Y),dow=d.getDay(),dia=DIAS[dow],dom=dow===0,mes=d.getMonth()+1,dd=d.getDate();
-  const T=(tiempo,semana,nombre,p,extra)=>({tiempo,semana,nombre,domingo:dom,p,...extra});
+  const T=(tiempo,semana,nombre,p,color,extra)=>({tiempo,semana,nombre,corto:nombre,domingo:dom,p,color,...extra});
 
   // — Adviento (hasta el 24 de diciembre) y Navidad (25-31 de diciembre) —
   if(dif(d,A.adv1)>=0){
     if(mes===11||dd<=24){
       const k=Math.floor(dif(d,A.adv1)/7)+1,sem='Semana '+k;
-      if(dom)return T('Adviento',sem,`${ordM(k)} domingo de Adviento`,1);
-      if(mes===12&&dd>=17)return T('Adviento',sem,`${dia} ${dd} de diciembre, feria mayor de Adviento`,4.5,{bajar:true});
-      return T('Adviento',sem,`${dia} de la ${ordF(k)} semana de Adviento`,5.5);
+      if(dom)return T('Adviento',sem,`${ordM(k)} domingo de Adviento`,1,k===3?'rosa':'morado',{corto:`${ordM(k)} domingo`+(k===3?' «Gaudete»':'')});
+      if(mes===12&&dd>=17)return T('Adviento',sem,`${dia} ${dd} de diciembre, feria mayor de Adviento`,4.5,'morado',{bajar:true,corto:'Feria mayor de Adviento'});
+      return T('Adviento',sem,`${dia} de la ${ordF(k)} semana de Adviento`,5.5,'morado',{corto:null});
     }
     const sagrada=(dom&&dd>=26)||(dd===30&&new Date(Y,11,25).getDay()===0);
-    if(sagrada)return T('Navidad','Octava de Navidad','Sagrada Familia de Jesús, María y José',3);
-    return T('Navidad','Octava de Navidad',dd===25?'Octava de Navidad':`${dia} de la octava de Navidad`,5.5);
+    if(sagrada)return T('Navidad',null,'Sagrada Familia de Jesús, María y José',3,'blanco');
+    return T('Navidad',null,dd===25?'Octava de Navidad':`${dia} de la octava de Navidad`,5.5,'blanco',{corto:'Octava de Navidad'});
   }
   // — Navidad (1 de enero hasta el Bautismo del Señor) —
   if(dif(d,A.bautismo)<=0){
-    if(dif(d,A.bautismo)===0)return T('Navidad',null,'Bautismo del Señor',3);
-    if(dd===1)return T('Navidad','Octava de Navidad','Octava de Navidad',5.5);
-    if(dom&&dd>=2&&dd<=5)return T('Navidad',null,'2.º domingo después de Navidad',3.5);
-    if(dd<6)return T('Navidad',null,`${dia} antes de la Epifanía`,5.5);
-    if(dd===6)return T('Navidad',null,`${dia} de Navidad`,5.5);
-    return T('Navidad',null,`${dia} después de la Epifanía`,5.5);
+    if(dif(d,A.bautismo)===0)return T('Navidad',null,'Bautismo del Señor',3,'blanco');
+    if(dd===1)return T('Navidad',null,'Octava de Navidad',5.5,'blanco');
+    if(dom&&dd>=2&&dd<=5)return T('Navidad',null,'2.º domingo después de Navidad',3.5,'blanco');
+    if(dd<6)return T('Navidad',null,`${dia} antes de la Epifanía`,5.5,'blanco',{corto:'Antes de la Epifanía'});
+    if(dd===6)return T('Navidad',null,`${dia} de Navidad`,5.5,'blanco',{corto:null});
+    return T('Navidad',null,`${dia} después de la Epifanía`,5.5,'blanco',{corto:'Después de la Epifanía'});
   }
   // — Tiempo Ordinario, primera parte (hasta el martes antes del Miércoles de Ceniza) —
   if(dif(d,A.ceniza)<0){
     const k=dif(suma(d,-dow),A.bautismo)/7+1;
-    return dom?T('Tiempo Ordinario','Semana '+k,`${ordM(k)} domingo del Tiempo Ordinario`,3.5)
-              :T('Tiempo Ordinario','Semana '+k,`${dia} de la ${ordF(k)} semana del Tiempo Ordinario`,5.5);
+    return dom?T('Tiempo Ordinario','Semana '+k,`${ordM(k)} domingo del Tiempo Ordinario`,3.5,'verde',{corto:`${ordM(k)} domingo`})
+              :T('Tiempo Ordinario','Semana '+k,`${dia} de la ${ordF(k)} semana del Tiempo Ordinario`,5.5,'verde',{corto:null});
   }
   // — Cuaresma (hasta el miércoles de la Semana Santa) —
   if(dif(d,suma(A.E,-3))<0){
     const n=dif(d,A.ceniza),prim=suma(A.E,-42);
-    if(n===0)return T('Cuaresma',null,'Miércoles de Ceniza',1);
-    if(n<4)return T('Cuaresma',null,`${dia} después de Ceniza`,4.5,{bajar:true});
+    if(n===0)return T('Cuaresma',null,'Miércoles de Ceniza',1,'morado');
+    if(n<4)return T('Cuaresma',null,`${dia} después de Ceniza`,4.5,'morado',{bajar:true,corto:'Después de Ceniza'});
     if(dom){
-      if(dif(d,A.ramos)===0)return T('Cuaresma','Semana Santa','Domingo de Ramos de la Pasión del Señor',1);
+      if(dif(d,A.ramos)===0)return T('Cuaresma','Semana Santa','Domingo de Ramos de la Pasión del Señor',1,'rojo');
       const k=dif(d,prim)/7+1;
-      return T('Cuaresma','Semana '+k,`${ordM(k)} domingo de Cuaresma`,1);
+      return T('Cuaresma','Semana '+k,`${ordM(k)} domingo de Cuaresma`,1,k===4?'rosa':'morado',{corto:`${ordM(k)} domingo`+(k===4?' «Laetare»':'')});
     }
-    if(dif(d,A.ramos)>0)return T('Cuaresma','Semana Santa',`${dia} Santo`,1);
+    if(dif(d,A.ramos)>0)return T('Cuaresma','Semana Santa',`${dia} Santo`,1,'morado');
     const k=dif(suma(d,-dow),prim)/7+1;
-    return T('Cuaresma','Semana '+k,`${dia} de la ${ordF(k)} semana de Cuaresma`,4.5,{bajar:true});
+    return T('Cuaresma','Semana '+k,`${dia} de la ${ordF(k)} semana de Cuaresma`,4.5,'morado',{bajar:true,corto:null});
   }
   // — Triduo Pascual —
   if(dif(d,A.E)<0){
     const n=dif(d,A.E);
-    return T('Triduo Pascual',null,n===-3?'Jueves Santo, Cena del Señor':n===-2?'Viernes Santo de la Pasión del Señor':'Sábado Santo',1);
+    return n===-3?T('Triduo Pascual',null,'Jueves Santo, Cena del Señor',1,'blanco')
+         :n===-2?T('Triduo Pascual',null,'Viernes Santo de la Pasión del Señor',1,'rojo')
+         :T('Triduo Pascual',null,'Sábado Santo',1,'morado');
   }
   // — Pascua —
   if(dif(d,A.pentecostes)<=0){
     const n=dif(d,A.E);
-    if(n===0)return T('Pascua','Octava de Pascua','Domingo de Pascua de la Resurrección del Señor',1);
-    if(n<7)return T('Pascua','Octava de Pascua',`${dia} de la octava de Pascua`,1);
-    if(n===7)return T('Pascua','Semana 2','2.º domingo de Pascua (de la Divina Misericordia)',1);
-    if(n===49)return T('Pascua',null,'Domingo de Pentecostés',1);
+    if(n===0)return T('Pascua',null,'Domingo de Pascua de la Resurrección del Señor',1,'blanco');
+    if(n<7)return T('Pascua',null,`${dia} de la octava de Pascua`,1,'blanco',{corto:'Octava de Pascua'});
+    if(n===7)return T('Pascua','Semana 2','2.º domingo de Pascua (de la Divina Misericordia)',1,'blanco',{corto:'2.º domingo (Divina Misericordia)'});
+    if(n===49)return T('Pascua',null,'Domingo de Pentecostés',1,'rojo');
     const k=dif(suma(d,-dow),A.E)/7+1;
-    return dom?T('Pascua','Semana '+k,`${ordM(k)} domingo de Pascua`,1)
-              :T('Pascua','Semana '+k,`${dia} de la ${ordF(k)} semana de Pascua`,5.5);
+    return dom?T('Pascua','Semana '+k,`${ordM(k)} domingo de Pascua`,1,'blanco',{corto:`${ordM(k)} domingo`})
+              :T('Pascua','Semana '+k,`${dia} de la ${ordF(k)} semana de Pascua`,5.5,'blanco',{corto:null});
   }
   // — Tiempo Ordinario, segunda parte: se cuenta hacia atrás desde el Adviento (la última semana es la 34) —
   const k=35-dif(A.adv1,suma(d,-dow))/7;
-  return dom?T('Tiempo Ordinario','Semana '+k,`${ordM(k)} domingo del Tiempo Ordinario`,3.5)
-            :T('Tiempo Ordinario','Semana '+k,`${dia} de la ${ordF(k)} semana del Tiempo Ordinario`,5.5);
+  return dom?T('Tiempo Ordinario','Semana '+k,`${ordM(k)} domingo del Tiempo Ordinario`,3.5,'verde',{corto:`${ordM(k)} domingo`})
+            :T('Tiempo Ordinario','Semana '+k,`${dia} de la ${ordF(k)} semana del Tiempo Ordinario`,5.5,'verde',{corto:null});
 }
 
 // ---------------------------------------------------------------------
@@ -195,6 +217,8 @@ function moviles(d){
 }
 
 // infoLiturgica(fecha, codigoPais): fecha = Date o 'AAAA-MM-DD'; codigoPais = 'PY'… (o '' = solo calendario romano)
+// Devuelve TODO lo que hay ese día (en «todas», de mayor a menor rango). Para mostrarlo con las opciones
+// del usuario (ocultar fiestas, memorias libres o semana) se pasa por vistaDia().
 export function infoLiturgica(fecha,codigo=''){
   const d=typeof fecha==='string'?desdeYmd(fecha):fecha,t=temporal(d),mes=d.getMonth()+1,dd=d.getDate();
   const pais=PAIS[String(codigo||'').toUpperCase()];
@@ -205,22 +229,50 @@ export function infoLiturgica(fecha,codigo=''){
   ];
   if(t.p===1)santos=santos.filter(s=>s[0]==='S');                // días mayores: solo se anotan las solemnidades
   if(t.tiempo==='Tiempo Ordinario'&&d.getDay()===6&&!santos.some(s=>PRIO[s[0]]<=5))santos.push(['L','Santa María en sábado']);   // sábados del T. Ordinario sin memoria obligatoria
-  const ents=[{nombre:t.nombre,rango:'T',p:t.p,temporal:true}];
+  const ents=[{nombre:t.nombre,corto:t.corto,rango:'T',p:t.p,temporal:true,color:t.color}];
   santos.forEach(([r,nombre])=>{
     const rango=(t.bajar&&r==='M')?'L':r;                          // en Cuaresma y 17-24 dic: memorias obligatorias → libres
-    ents.push({nombre,rango:rango==='FS'?'F':rango,p:PRIO[rango]});
+    ents.push({nombre,corto:nombre,rango:rango==='FS'?'F':rango,p:PRIO[rango],color:colorSanto(nombre)});
   });
-  ents.forEach((e,i)=>{e.i=i});
+  ents.forEach((e,i)=>{e.i=i;e.etiqueta=e.rango==='T'?'':ETIQUETA[e.rango]});
   ents.sort((a,b)=>(a.p-b.p)||(a.i-b.i));                          // empate: se respeta el orden de arriba
-  const principal=ents[0],otros=ents.slice(1).filter(e=>!e.temporal);
-  const etiq=e=>e.rango==='T'?(d.getDay()===0?'Domingo':''):ETIQUETA[e.rango];
-  principal.etiqueta=etiq(principal);otros.forEach(o=>{o.etiqueta=etiq(o)});
+  const principal=ents[0];
   return {
     fecha:d,ymd:aYmd(d),
-    tiempo:t.tiempo,semana:t.semana,nombreDia:t.nombre,        // nombreDia = el nombre del día según el tiempo (p. ej. «Lunes de la 1.ª semana de Adviento»)
+    tiempo:t.tiempo,semana:t.semana,nombreDia:t.nombre,
     domingo:d.getDay()===0,
-    principal,otros,                                              // principal = la celebración que manda hoy · otros = memorias libres u otras anotaciones
+    principal,                                                     // la celebración que manda ese día
+    otros:ents.slice(1).filter(e=>!e.temporal),                    // memorias libres u otras anotaciones
+    todas:ents,
+    color:principal.color,
     destacado:principal.p<=4||d.getDay()===0                      // solemnidad, fiesta, día mayor o domingo
+  };
+}
+
+// vistaDia(info, opciones): lo que se muestra de un día, sin repetir datos.
+//   opciones: {fiestas, libres, semana}  (true = mostrar; por defecto todo)
+//   «fiestas» = fiestas y memorias obligatorias · «libres» = memorias libres · «semana» = la semana del tiempo.
+//   Las solemnidades, las conmemoraciones y los domingos se muestran siempre.
+// Devuelve: {tiempo, semana, titulo, etiqueta, otros, destacado, rotulado, domingo, color, principal}
+//   · tiempo  = «Tiempo Ordinario»          · semana = «Semana 34» (no en domingos: ya lo dice el título)
+//   · titulo  = «34.º domingo» o el nombre de la celebración; null en una feria común
+//   · color   = entrada de COLORES (si se oculta una fiesta, el color es el del tiempo)
+export function vistaDia(i,o={}){
+  const op={fiestas:true,libres:true,semana:true,...o};
+  const visible=e=>e.temporal||e.rango==='S'||e.rango==='C'||(e.rango==='L'?op.libres:op.fiestas);
+  const lista=i.todas.filter(visible),p=lista[0];
+  const sem=i.semana&&/^Semana/.test(i.semana)&&!(i.domingo&&/^Semana \d/.test(i.semana))?i.semana:null;
+  return {
+    tiempo:i.tiempo,
+    semana:op.semana?sem:null,
+    titulo:p.temporal?(p.corto||null):p.nombre,
+    etiqueta:p.temporal?'':p.etiqueta,
+    otros:lista.filter(e=>!e.temporal&&e!==p),
+    destacado:p.p<=4||i.domingo,                                   // para listas cortas (Inicio): domingos, solemnidades y fiestas
+    rotulado:!!(p.temporal?p.corto:p.nombre)&&(p.p<=4||i.domingo||p.rango==='M'),   // para rotular la celda del calendario: además, memorias obligatorias
+    domingo:i.domingo,
+    color:COLORES[p.color],
+    principal:p
   };
 }
 
@@ -242,37 +294,37 @@ export function proximosDias(desde=new Date(),n=10,codigo=codigoPais()){
 // El tiempo y la semana en una línea: «Adviento · Semana 1»
 export const lineaTiempo=i=>i.tiempo+(i.semana?' · '+i.semana:'');
 
+// puntoColor: el circulito con el color litúrgico (c = una entrada de COLORES).
+export const puntoColor=c=>`<i class="lc" style="--lc:${c.hex};--lcb:${c.borde}" role="img" aria-label="Color litúrgico: ${c.nombre.toLowerCase()}" title="Color litúrgico: ${c.nombre.toLowerCase()}"></i>`;
+
 // tarjetaLiturgica: el cuadro pequeño de Inicio (hoy + próximos 10 días).
 export function tarjetaLiturgica(){
-  const hoy=new Date(),cod=codigoPais(),h=infoLiturgica(hoy,cod),prox=proximosDias(hoy,10,cod);
-  const otroNombre=h.principal.nombre!==h.nombreDia;
-  const fila=x=>`<li class="${x.domingo?'dom':''}"><span class="lt-f">${DCORTO[x.fecha.getDay()]} ${x.fecha.getDate()} ${MCORTO[x.fecha.getMonth()]}</span><span class="lt-n">${esc(x.principal.nombre)}</span></li>`;
+  const hoy=new Date(),cod=codigoPais(),v=vistaDia(infoLiturgica(hoy,cod)),prox=proximosDias(hoy,10,cod);
+  const fila=x=>`<li class="${x.domingo?'dom':''}">${puntoColor(COLORES[x.color])}<span class="lt-f">${DCORTO[x.fecha.getDay()]} ${x.fecha.getDate()} ${MCORTO[x.fecha.getMonth()]}</span><span class="lt-n">${esc(x.principal.nombre)}</span></li>`;
   return `<section class="c2 liturgico" aria-label="Tiempo litúrgico">
-    <div class="lt-cab"><span>${esc(h.tiempo)}</span>${h.semana?`<small>${esc(h.semana)}</small>`:''}</div>
-    <b class="lt-nombre">${esc(h.principal.nombre)}</b>
-    ${h.principal.etiqueta&&!h.domingo?`<span class="lt-rango">${esc(h.principal.etiqueta)}</span>`:''}
-    ${otroNombre?`<small class="lt-sub">${esc(h.nombreDia)}</small>`:''}
+    <div class="lt-cab">${puntoColor(v.color)}<span>${esc(v.tiempo)}</span>${v.semana?`<span class="lt-s">${esc(v.semana)}</span>`:''}</div>
+    <b class="lt-nombre">${esc(v.titulo||DIAS[hoy.getDay()])}</b>
+    ${v.etiqueta?`<span class="lt-rango">${esc(v.etiqueta)}</span>`:''}
     <h3 class="lt-tit">Próximos días</h3>
     ${prox.length?`<ul class="lt-prox">${prox.map(fila).join('')}</ul>`:'<p class="vacio" style="margin:0">No hay días especiales en los próximos 10 días.</p>'}
   </section>`;
 }
 
 // ---------------------------------------------------------------------
-// 6. ESTILOS  (los colores litúrgicos se diseñarán más adelante)
+// 6. ESTILOS  (neutros: el color lo pone solo el circulito litúrgico)
 // ---------------------------------------------------------------------
 const st=document.createElement('style');
-st.textContent=`.liturgico{display:flex;flex-direction:column;gap:6px}
-.liturgico .lt-cab{display:flex;align-items:baseline;justify-content:space-between;gap:8px;color:var(--oro-texto);font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:.04em}
-.liturgico .lt-cab small{color:var(--gris);font-weight:700;text-transform:none;letter-spacing:0;font-size:12.5px}
-.liturgico .lt-nombre{font-size:17px;line-height:1.3}
-.liturgico .lt-sub{color:var(--gris);font-weight:600;font-size:13px}
-.liturgico .lt-rango{align-self:flex-start;background:var(--oro-claro);color:var(--oro-texto);font-weight:800;font-size:12px;padding:2px 10px;border-radius:999px}
+st.textContent=`.lc{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;background:var(--lc);box-shadow:0 0 0 1.5px var(--lcb)}
+.liturgico{display:flex;flex-direction:column;gap:6px}
+.liturgico .lt-cab{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--gris)}
+.liturgico .lt-cab .lt-s{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:700}
+.liturgico .lt-nombre{font-size:18px;line-height:1.3}
+.liturgico .lt-rango{align-self:flex-start;border:1px solid var(--linea-2);color:var(--gris);font-weight:700;font-size:12px;padding:1px 10px;border-radius:999px}
 .liturgico .lt-tit{margin:14px 0 2px;font-size:14px;font-family:var(--fuente);font-weight:700;color:var(--gris)}
-.liturgico .lt-prox{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
-.liturgico .lt-prox li{display:flex;gap:10px;align-items:baseline;padding:6px 8px;border-radius:8px;font-size:13.5px;font-weight:600}
-.liturgico .lt-prox li.dom{background:var(--oro-claro);color:var(--oro-texto);font-weight:800}
+.liturgico .lt-prox{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.liturgico .lt-prox li{display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:8px;font-size:13.5px;font-weight:600}
+.liturgico .lt-prox li.dom{background:var(--capa);font-weight:800}
 .liturgico .lt-f{flex:none;min-width:70px;color:var(--gris);font-weight:700}
-.liturgico .lt-prox li.dom .lt-f{color:inherit}
 .liturgico .lt-n{min-width:0;overflow-wrap:anywhere}
 @media(max-width:860px){.col2 .barra-lateral{order:-1;flex-basis:100%}}`;
 document.head.append(st);
