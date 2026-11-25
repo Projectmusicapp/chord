@@ -1,6 +1,7 @@
 // ===== PANTALLA: CALENDARIO (mes + panel de detalles del día) =====
 import {$,esc,guardar,crear,eliminar,vistas,ic,modal,escucharPropio,puedeEditar,ambitoActual} from "./base.js";
 import {E as ED,alCambiar} from "./estado.js";
+import {infoLiturgica,codigoPais,alCambiarLiturgia,lineaTiempo} from "./liturgico.js";   // tiempo litúrgico (ver liturgico.js)
 
 const st=document.createElement('style');
 st.textContent=`.cols{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}
@@ -43,7 +44,12 @@ st.textContent=`.cols{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap
 .fev .pie{display:flex;justify-content:flex-end;gap:8px}
 @media(max-width:900px){.cols{grid-template-columns:minmax(0,1fr)}.pan{position:static}}
 @media(max-width:600px){.cal{gap:3px}.cal .d{min-height:54px;padding:4px;border-radius:9px;gap:2px}.cal .d b{font-size:12px;min-width:22px;height:22px;margin:0}
-  .cal .p{height:5px;padding:0;font-size:0;border-radius:3px}.cal .p.rep{background:var(--azul)}.cal .p.rep svg{display:none}.cal small{font-size:10px;line-height:1}.cal .w{font-size:11px}}`;
+  .cal .p{height:5px;padding:0;font-size:0;border-radius:3px}.cal .p.rep{background:var(--azul)}.cal .p.rep svg{display:none}.cal small{font-size:10px;line-height:1}.cal .w{font-size:11px}.cal .d .lit{font-size:0;height:5px;padding:0;border-radius:3px;background:var(--oro)}.cal .d .lit.dom{background:var(--azul)}}
+.cal .lit{font-size:10.5px;font-weight:700;color:var(--oro-texto);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}.cal .lit.dom{color:var(--azul)}
+.litp{background:var(--oro-claro);border-radius:var(--r-m);padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.litp small{color:var(--oro-texto);font-weight:700}.litp b{font-size:15.5px;line-height:1.3}
+.litp .rg{align-self:flex-start;font-size:12px;font-weight:800;color:var(--oro-texto)}
+.litp ul{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:2px;font-size:13.5px;color:var(--gris);font-weight:600}.litp ul span{font-weight:800;color:var(--oro-texto)}`;
 document.head.append(st);
 
 const COL=['#1F6FEB','#2E7D32','#7B1FA2','#D9822B','#B3261E','#757575'];
@@ -62,6 +68,7 @@ const pill=e=>`<span class="p" style="background:${e.color}" aria-hidden="true">
 
 escucharPropio('eventos',l=>{E=l;pCal();if(!form)pPan()});
 escucharPropio('dias',l=>{D=l;pCal();if(!form)pPan()});
+alCambiarLiturgia(()=>{pCal();if(!form)pPan()});   // cuando cargan las misiones se conoce el país y se añaden sus fiestas
 // Los repertorios (ya filtrados por misión) se leen de estado.js en vez de escucharlos por
 // cuenta propia, para no leer la colección dos veces (ver el comentario al principio de ese archivo).
 alCambiar(()=>{R=ED.repertorios.filter(r=>!r.miLista&&!r.privado);pCal();if(!form)pPan()});   // sin las «Mi lista» ni los repertorios personales de cuentas «Usuario»   // los llena la Parte 3
@@ -74,13 +81,15 @@ addEventListener('hashchange',()=>{if(location.hash!=='#calendario')el=null});
 
 function pCal(){
   if(!el||!$('#cal'))return;
-  const y=mes.getFullYear(),m=mes.getMonth(),ini=mes.getDay(),n=new Date(y,m+1,0).getDate(),hoy=ymd(new Date());
+  const y=mes.getFullYear(),m=mes.getMonth(),ini=mes.getDay(),n=new Date(y,m+1,0).getDate(),hoy=ymd(new Date()),cp=codigoPais();
   let h=`<div class="chd"><h1 class="mt" aria-live="polite">${MES[m]} ${y}</h1><div class="bt"><button class="ic" data-nav="-1" aria-label="Mes anterior">${ic('lft')}</button><button class="ic w" data-nav="0">Hoy</button><button class="ic" data-nav="1" aria-label="Mes siguiente">${ic('rgt')}</button></div></div><div class="cal">`
     +DCORTO.map((x,i)=>`<div class="w"><abbr title="${DIA[i]}" style="text-decoration:none">${x}</abbr></div>`).join('')+'<div></div>'.repeat(ini);
   for(let d=1;d<=n;d++){
     const f=y+'-'+dos(m+1)+'-'+dos(d),hl=diaDe(D,f),evs=E.filter(e=>e.fecha===f).sort((a,b)=>(a.hora||'').localeCompare(b.hora||'')),rs=R.filter(r=>r.fecha===f);
-    const etiqueta=DIA[new Date(y,m,d).getDay()]+' '+d+' de '+MES[m]+(evs.length?', '+evs.length+(evs.length>1?' eventos':' evento'):'')+(rs.length?', '+rs.length+(rs.length>1?' repertorios':' repertorio'):'');
+    const li=infoLiturgica(new Date(y,m,d),cp);
+    const etiqueta=DIA[new Date(y,m,d).getDay()]+' '+d+' de '+MES[m]+(li.destacado?', '+li.principal.nombre:'')+(evs.length?', '+evs.length+(evs.length>1?' eventos':' evento'):'')+(rs.length?', '+rs.length+(rs.length>1?' repertorios':' repertorio'):'');
     h+=`<button class="d${f===hoy?' hoy':''}${f===sel?' sel':''}" data-dia="${f}" aria-label="${esc(etiqueta)}" aria-pressed="${f===sel}" ${f===hoy?'aria-current="date"':''} ${hl?`style="background:${hl.color}33"`:''}><b>${d}</b>`
+      +(li.destacado?`<span class="lit${li.domingo?' dom':''}" aria-hidden="true">${esc(li.principal.nombre)}</span>`:'')
       +evs.slice(0,2).map(pill).join('')+(evs.length>2?`<small>+${evs.length-2} m\u00e1s</small>`:'')
       +(rs.length?`<span class="p rep" aria-hidden="true">${ic('mus',11)} ${rs.length>1?rs.length+' repertorios':esc(rs[0].nombre)}</span>`:'')+'</button>';
   }
@@ -106,6 +115,7 @@ function pPan(){
       <div class="fl2">Color<div class="colores" role="group" aria-label="Color del evento">${COL.map(c=>`<button class="sw${c===form.color?' on':''}" data-fc="${c}" style="background:${c}" aria-label="${NCOL[c]}" aria-pressed="${c===form.color}" title="${NCOL[c]}"></button>`).join('')}</div></div>
       <div class="pie"><button class="sec" data-no>Cancelar</button><button data-ok>${form.id?'Guardar cambios':'Guardar evento'}</button></div></div>`;
   }else{
+    h+=bloqueLit(dt);
     h+=(evs.map(e=>`<div class="ev"><span class="bar" style="background:${e.color}"></span><div class="t"><b>${esc(e.titulo)}</b>${e.hora?`<span class="hora">${esc(e.hora)}</span>`:''}${e.notas?`<small>${esc(e.notas)}</small>`:''}${repEv(e)}</div>${editar?`<button class="ic" data-e="${e.id}" aria-label="Editar \u00ab${esc(e.titulo)}\u00bb" title="Editar">${ic('edt',16)}</button><button class="ic rj" data-x="${e.id}" aria-label="Eliminar \u00ab${esc(e.titulo)}\u00bb" title="Eliminar">${ic('trs',16)}</button>`:''}</div>`).join('')||'<p class="vac" style="margin:0">No hay eventos este d\u00eda.</p>')
       +rs.map(r=>`<div class="ev rp"><div class="t" style="display:flex;align-items:center;gap:10px;font-weight:700;color:var(--azul)">${ic('mus',18)} ${esc(r.nombre)}</div><button data-rep="${r.id}">Abrir</button></div>`).join('')
       +(editar?`<button data-add>${ic('pls',16)} A\u00f1adir evento</button>
@@ -114,6 +124,16 @@ function pPan(){
       <div class="resaltar"><span id="rl">Resaltar d\u00eda</span><div class="colores" role="group" aria-labelledby="rl">${COL.map(c=>`<button class="sw${hl&&hl.color===c?' on':''}" data-sw="${c}" style="background:${c}" aria-label="${NCOL[c]}" aria-pressed="${!!(hl&&hl.color===c)}" title="${NCOL[c]}"></button>`).join('')}</div>${hl?'<button class="lnk" data-hq>Quitar</button>':''}</div>`:'');
   }
   $('#pan').innerHTML=h;
+}
+
+// bloqueLit: el cuadro del tiempo litúrgico arriba del panel del día (tiempo, semana, nombre del día y memorias libres).
+function bloqueLit(dt){
+  const i=infoLiturgica(dt,codigoPais()),p=i.principal;
+  return `<div class="litp"><small>${esc(lineaTiempo(i))}</small><b>${esc(p.nombre)}</b>`
+    +(p.rango!=='T'?`<span class="rg">${esc(p.etiqueta)}</span>`:'')
+    +(p.nombre!==i.nombreDia?`<small>${esc(i.nombreDia)}</small>`:'')
+    +(i.otros.length?`<ul>${i.otros.map(o=>`<li><span>${esc(o.etiqueta)}:</span> ${esc(o.nombre)}</li>`).join('')}</ul>`:'')
+    +'</div>';
 }
 
 function clic(e){

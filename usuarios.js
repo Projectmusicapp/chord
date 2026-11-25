@@ -47,6 +47,7 @@ import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesio
 import {ventana as abrirRespaldo} from "./respaldo.js";
 import {E,alCambiar} from "./estado.js";
 import {misionesCargadas,alCambiarMisiones,listaMisiones,misionPorId,etiquetaMision,PAISES,alfa,selectorBandera,activarSelectores,banderaHtml} from "./misiones.js";
+import {tarjetaLiturgica,alCambiarLiturgia} from "./liturgico.js";   // tiempo litúrgico (cuadro de Inicio)
 const NOMBRE_PAIS=Object.fromEntries(PAISES);
 
 // NIVELES: los 5 «niveles» que se pueden elegir (el Editor tiene dos variantes).
@@ -767,6 +768,7 @@ function pintarInicio(){
         <div class="nh"><h2>Novedades</h2><small>Lo más reciente</small></div>
         <div class="ulist">${items.map(filaNovedad).join('')||'<p class="vacio">Aún no hay novedades.</p>'}</div>
       </section>
+      <aside class="barra-lateral">${tarjetaLiturgica()}</aside>
     </div>`;
 }
 const inicioOrig=vistas.inicio;
@@ -777,3 +779,4 @@ vistas.inicio=contenedor=>{
 };
 addEventListener('hashchange',()=>{const v=location.hash.slice(1)||'inicio';if(v!=='inicio')elInicio=null});
 alCambiar(pintarInicio);
+alCambiarLiturgia(pintarInicio);   // al cargar las misiones se conoce el país y se pintan sus fiestas
