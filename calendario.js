@@ -74,7 +74,7 @@ const diaDe=(lista,f)=>lista.find(x=>(x.fecha||x.id)===f);
 let E=[],D=[],R=[],el=null,mes=new Date(),sel=ymd(new Date()),form=null;
 mes.setDate(1);
 // Qué se muestra del tiempo litúrgico (menú ⋮ de arriba; se recuerda en este dispositivo).
-const OPC={solemnidades:true,fiestas:true,libres:false,semana:true};let litAbierto=false;
+const OPC={solemnidades:true,fiestas:true,libres:false};let litAbierto=false;
 try{Object.assign(OPC,JSON.parse(localStorage.getItem('cal-liturgia-2')||'{}'))}catch(e){}
 const guardarOpc=()=>{try{localStorage.setItem('cal-liturgia-2',JSON.stringify(OPC))}catch(e){}};
 const pill=e=>`<span class="p" style="background:${e.color}" aria-hidden="true">${esc(e.titulo)}</span>`;
@@ -144,7 +144,7 @@ function pPan(){
 // bloqueLit: el cuadro del tiempo litúrgico arriba del panel del día. Sin repetir datos: el día ya está en el
 // encabezado; aquí van el tiempo (con su color), la semana, el título si lo hay y las memorias libres.
 function bloqueLit(dt){
-  const v=vistaDia(infoLiturgica(dt,codigoPais()),{semana:OPC.semana});   // el panel de abajo lleva todo el detalle: no depende de lo que se marque en las celdas
+  const v=vistaDia(infoLiturgica(dt,codigoPais()));   // el panel de abajo lleva todo el detalle: no depende de lo que se marque en las celdas
   return `<div class="litp"><div class="lph">${puntoColor(v.color)}<span>${esc(v.tiempo)}</span>${v.semana?`<span class="lps">${esc(v.semana)}</span>`:''}</div>`
     +(v.titulo?`<b>${esc(v.titulo)}</b>`:'')
     +(v.etiqueta?`<span class="rg">${esc(v.etiqueta)}</span>`:'')
@@ -156,7 +156,7 @@ function bloqueLit(dt){
 // de abajo siempre trae el detalle completo. Se cierra al tocar fuera, en el ⋮ o con Esc.
 function menuLit(){
   const o=(k,t)=>`<label><input type="checkbox" data-lo="${k}"${OPC[k]?' checked':''}> ${t}</label>`;
-  return `<details class="cmn"${litAbierto?' open':''}><summary aria-label="Opciones del calendario" title="Opciones">&#8942;</summary><div role="group" aria-label="Qué mostrar"><div class="cmt">Marcar en el calendario</div>${o('solemnidades','Solemnidades')}${o('fiestas','Fiestas y memorias obligatorias')}${o('libres','Memorias libres')}<div class="cmt">Detalle del día</div>${o('semana','Semana del tiempo litúrgico')}</div></details>`;
+  return `<details class="cmn"${litAbierto?' open':''}><summary aria-label="Opciones del calendario" title="Opciones">&#8942;</summary><div role="group" aria-label="Qué mostrar"><div class="cmt">Marcar en el calendario</div>${o('solemnidades','Solemnidades')}${o('fiestas','Fiestas y memorias obligatorias')}${o('libres','Memorias libres')}</div></details>`;
 }
 const cerrarMenuLit=()=>{litAbierto=false;const m=document.querySelector('.cmn[open]');if(m)m.removeAttribute('open')};
 document.addEventListener('click',e=>{if(!(e.target.closest&&e.target.closest('.cmn')))cerrarMenuLit()},true);
