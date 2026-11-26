@@ -250,16 +250,16 @@ export function infoLiturgica(fecha,codigo=''){
 }
 
 // vistaDia(info, opciones): lo que se muestra de un día, sin repetir datos.
-//   opciones: {fiestas, libres, semana}  (true = mostrar; por defecto todo)
+//   opciones: {domingos, solemnidades, fiestas, libres, semana}  (true = mostrar; por defecto todo)
+//   «domingos» = marcar los domingos en la celda del calendario · «solemnidades» = solemnidades y conmemoraciones
 //   «fiestas» = fiestas y memorias obligatorias · «libres» = memorias libres · «semana» = la semana del tiempo.
-//   Las solemnidades, las conmemoraciones y los domingos se muestran siempre.
 // Devuelve: {tiempo, semana, titulo, etiqueta, otros, destacado, rotulado, domingo, color, principal}
 //   · tiempo  = «Tiempo Ordinario»          · semana = «Semana 34» (no en domingos: ya lo dice el título)
 //   · titulo  = «34.º domingo» o el nombre de la celebración; null en una feria común
 //   · color   = entrada de COLORES (si se oculta una fiesta, el color es el del tiempo)
 export function vistaDia(i,o={}){
-  const op={fiestas:true,libres:true,semana:true,...o};
-  const visible=e=>e.temporal||e.rango==='S'||e.rango==='C'||(e.rango==='L'?op.libres:op.fiestas);
+  const op={domingos:true,solemnidades:true,fiestas:true,libres:true,semana:true,...o};
+  const visible=e=>e.temporal||(e.rango==='S'||e.rango==='C'?op.solemnidades:e.rango==='L'?op.libres:op.fiestas);
   const lista=i.todas.filter(visible),p=lista[0];
   const sem=i.semana&&/^Semana/.test(i.semana)&&!(i.domingo&&/^Semana \d/.test(i.semana))?i.semana:null;
   return {
@@ -269,7 +269,7 @@ export function vistaDia(i,o={}){
     etiqueta:p.temporal?'':p.etiqueta,
     otros:lista.filter(e=>!e.temporal&&e!==p),
     destacado:p.p<=4||i.domingo,                                   // para listas cortas (Inicio): domingos, solemnidades y fiestas
-    rotulado:!!(p.temporal?p.corto:p.nombre)&&(p.p<=4||i.domingo||p.rango==='M'),   // para rotular la celda del calendario: además, memorias obligatorias
+    rotulado:!!(p.temporal?p.corto:p.nombre)&&(p.p<=4||i.domingo||p.rango==='M')&&!(p.temporal&&i.domingo&&!op.domingos),   // para rotular la celda del calendario: además, memorias obligatorias; el domingo solo si se pidió
     domingo:i.domingo,
     color:COLORES[p.color],
     principal:p
