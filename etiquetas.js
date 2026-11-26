@@ -11,9 +11,34 @@
 //   - Editar, renombrar y eliminar siguen igual, dentro de cada grupo.
 //  Líneas nuevas o cambiadas: terminan en «// Chigo» o están entre «CHIGO» y «FIN CHIGO».
 //  ===== FIN CHIGO =====
+//
+//  ===== TIEMPO LITÚRGICO · CAMBIOS EN ESTE ARCHIVO =====
+//  Hay un tercer grupo, «Tiempos litúrgicos» (grupo:'tiempo'), entre «Misas» y «Otros».
+//   - Son 5 etiquetas fijas (los mismos tiempos de liturgico.js): Adviento, Navidad, Cuaresma,
+//     Triduo Pascual y Pascua. Se crean solas (asegurarTiempos) y no se pueden añadir ni eliminar;
+//     el nombre sí se puede cambiar (cada una guarda su clave en el campo «tiempo»).
+//   - El Tiempo Ordinario NO tiene etiqueta: toda canción sin etiqueta de tiempo es «ordinaria».
+//   - Las usan repertorio.js (qué canciones ofrecer según la fecha) y editor.js (el desplegable).
+//   - Misas y Otros siguen exactamente igual.
+//  Todo lo nuevo está entre «TIEMPOS» y «FIN TIEMPOS» (o termina en «// TIEMPOS»).
+//  ===== FIN TIEMPO LITÚRGICO =====
 // =====================================================================
-import {$,esc,guardar,crear,eliminar,ic,modal} from "./base.js";
+import {$,esc,guardar,crear,eliminar,ic,modal,ambitoActual} from "./base.js";
 import {E,alCambiar} from "./estado.js";
+
+// ===== TIEMPOS · etiquetas fijas de tiempo litúrgico =====
+export const TIEMPOS=['Adviento','Navidad','Cuaresma','Triduo Pascual','Pascua'];      // los mismos nombres que devuelve liturgico.js
+const pedidas=new Set();                                                                // las que ya se mandaron a crear (para no duplicarlas)
+// Crea las que falten. Solo actúa cuando las etiquetas ya cargaron (si no, crearía duplicados).
+export function asegurarTiempos(){
+  if(!E.etiquetas.length)return;
+  TIEMPOS.forEach(n=>{
+    const clave=ambitoActual()+'|'+n;
+    if(pedidas.has(clave)||E.etiquetas.some(t=>t.grupo==='tiempo'&&(t.tiempo||t.nombre)===n))return;
+    pedidas.add(clave);crear('etiquetas',{nombre:n,grupo:'tiempo',tiempo:n});
+  });
+}
+// ===== FIN TIEMPOS =====
 
 export function etiquetas(alCerrar){
   let modoEditar=false;                          // ¿está activado el botón «Editar»?
@@ -21,14 +46,15 @@ export function etiquetas(alCerrar){
   const ventana=modal('<div id="te"></div>'),zona=$('#te',ventana);
 
   // ===== CHIGO · Grupos «Misas» y «Otros» =====
-  const GRUPOS=[['misa','Misas'],['otro','Otros']];
-  const grupoDe=t=>t.grupo==='otro'?'otro':'misa';                 // las etiquetas viejas (sin grupo) son de misa
+  const GRUPOS=[['misa','Misas'],['tiempo','Tiempos lit\u00fargicos'],['otro','Otros']];   // TIEMPOS: grupo nuevo en medio
+  const grupoDe=t=>t.grupo==='otro'?'otro':t.grupo==='tiempo'?'tiempo':'misa';   // las etiquetas viejas (sin grupo) son de misa
   const bloqueGrupos=()=>GRUPOS.map(([g,titulo])=>{
-    const lista=E.etiquetas.filter(t=>grupoDe(t)===g);
+    const lista=E.etiquetas.filter(t=>grupoDe(t)===g),fijo=g==='tiempo';                 // TIEMPOS: «fijo» = sin cuadro para a\u00f1adir ni bot\u00f3n de eliminar
     return `<section class="te-grupo"><h3 style="margin:18px 0 8px;font-size:15px">${titulo}</h3>
-      <div class="barra"><input id="nt-${g}" placeholder="Nueva etiqueta" aria-label="Nueva etiqueta de ${titulo.toLowerCase()}" autocomplete="off"><button data-add="${g}">${ic('pls',16)} A\u00f1adir</button></div>
+      ${fijo?'<p class="vacio" style="margin:0 0 8px">Las usa el Repertorio seg\u00fan la fecha. El Tiempo Ordinario no lleva etiqueta.</p>'
+      :`<div class="barra"><input id="nt-${g}" placeholder="Nueva etiqueta" aria-label="Nueva etiqueta de ${titulo.toLowerCase()}" autocomplete="off"><button data-add="${g}">${ic('pls',16)} A\u00f1adir</button></div>`}
       <div class="tags">${lista.map(t=>modoEditar
-        ?`<span class="tag"><input data-te="${t.id}" value="${esc(t.nombre)}" aria-label="Nombre"><button class="ic" data-tx="${t.id}" aria-label="Eliminar">${ic('trs',14)}</button></span>`
+        ?`<span class="tag"><input data-te="${t.id}" value="${esc(t.nombre)}" aria-label="Nombre">${fijo?'':`<button class="ic" data-tx="${t.id}" aria-label="Eliminar">${ic('trs',14)}</button>`}</span>`
         :`<span class="tag">${esc(t.nombre)}</span>`).join('')||'<p class="vacio">Sin etiquetas.</p>'}</div></section>`;
   }).join('');
   // ===== FIN CHIGO =====
@@ -36,6 +62,7 @@ export function etiquetas(alCerrar){
   // Dibuja el contenido de la ventana (se llama cada vez que algo cambia)
   function dibujar(){
     if(!ventana.isConnected){dejarDeEscuchar();if(alCerrar)alCerrar();return}   // la ventana ya se cerró
+    asegurarTiempos();                                                           // TIEMPOS: crea las 5 etiquetas de tiempo si faltan
     const activo=document.activeElement,enCampo=activo&&zona.contains(activo)?(activo.id||activo.dataset.te||null):null,texto=activo&&activo.id&&activo.id.startsWith('nt-')?activo.value:'';   // Chigo: ahora hay dos cuadros de texto (nt-misa y nt-otro)
     zona.innerHTML=`<div class="mh"><h2>Etiquetas</h2><div class="mb"><button class="${modoEditar?'':'sec'}" data-ed>${modoEditar?'Listo':ic('edt',16)+' Editar'}</button><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div></div>
       ${/* Chigo: los dos grupos (Misas y Otros) se dibujan con bloqueGrupos(), definido arriba */ bloqueGrupos()}`;
@@ -58,6 +85,7 @@ export function etiquetas(alCerrar){
   ventana.onchange=e=>{                                                // renombrar (si queda en blanco, se elimina)
     const caja=e.target,t=caja.dataset.te&&E.etiquetas.find(x=>x.id===caja.dataset.te);
     if(!t)return;const nuevo=caja.value.trim();
-    if(!nuevo)eliminar('etiquetas',t,'',true);else guardar('etiquetas',t.id,{nombre:nuevo});
+    if(!nuevo){if(t.grupo==='tiempo')dibujar();else eliminar('etiquetas',t,'',true)}   // TIEMPOS: las de tiempo no se eliminan (en blanco vuelve el nombre)
+    else guardar('etiquetas',t.id,{nombre:nuevo});
   };
 }

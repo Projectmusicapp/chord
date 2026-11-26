@@ -4,6 +4,7 @@ import {MOM,MES,fechaLarga,cancion,textosDespues,esPeticiones,lineasTx,lineasTxH
 import {FIJAS,PROPOR,colorOk,CT,svgI as ico} from "./formato.js";
 import {elegirEscala,textoEquipo,equipoDe,alCambiarEquipos} from "./equipos.js";
 import {E,alCambiar} from "./estado.js";
+import {infoLiturgica,aYmd} from "./liturgico.js";   // TIEMPOS: tiempo lit\u00fargico seg\u00fan la fecha del repertorio
 
 const st=document.createElement('style');
 st.textContent=`[data-vista=repertorio] .rcols{display:grid;grid-template-columns:400px minmax(0,1fr);gap:24px;align-items:start}
@@ -95,7 +96,24 @@ const sec=id=>rep.secciones.find(s=>s.id===id);
 const etiquetasEvento=s=>T.filter(t=>t.grupo==='otro'||t.id===s.tag);
 // ===== FIN CHIGO =====
 const tagId=n=>T.find(t=>t.nombre.toLowerCase()===n.toLowerCase())?.id;
-const candMom=id=>{const g=tagId(MOM.find(m=>m[0]===id)[1]);return g?C.filter(c=>(c.etiquetas||[]).includes(g)):[]};
+// ===== TIEMPOS · canciones que se ofrecen en cada momento de la misa =====
+// El tiempo sale de la fecha del repertorio (sin fecha, la de hoy). Etiquetas de tiempo: grupo 'tiempo' (ver etiquetas.js).
+//  · Tiempo Ordinario: solo las canciones del momento SIN etiqueta de tiempo (como siempre).
+//  · Adviento, Navidad, Cuaresma, Triduo o Pascua: candMom devuelve {tiempo, esp, gen}
+//      esp = canciones del momento con la etiqueta de ese tiempo · gen = las del momento sin ninguna etiqueta de tiempo (ordinarias).
+//    Las que son solo de otro tiempo no se ofrecen (salvo con «Ver todas las canciones»).
+const tiempoRep=()=>{try{return infoLiturgica((rep&&rep.fecha)||aYmd(new Date()),'').tiempo}catch(e){return'Tiempo Ordinario'}};
+const candMom=id=>{
+  const g=tagId(MOM.find(m=>m[0]===id)[1]),base=g?C.filter(c=>(c.etiquetas||[]).includes(g)):[];
+  const ids=T.filter(t=>t.grupo==='tiempo').map(t=>t.id),conTiempo=c=>(c.etiquetas||[]).some(x=>ids.includes(x));
+  const gen=base.filter(c=>!conTiempo(c)),tm=tiempoRep();
+  if(tm==='Tiempo Ordinario')return gen;
+  const et=T.find(t=>t.grupo==='tiempo'&&(t.tiempo||t.nombre)===tm);
+  return {tiempo:tm,esp:et?base.filter(c=>c.etiquetas.includes(et.id)):[],gen};
+};
+// Lista plana para «Al azar» y «Aleatorio»: primero las del tiempo; si no hay ninguna, las ordinarias.
+const candPlano=id=>{const c=candMom(id);return Array.isArray(c)?c:(c.esp.length?c.esp:c.gen)};
+// ===== FIN TIEMPOS =====
 const candSec=s=>s.tag?C.filter(c=>(c.etiquetas||[]).includes(s.tag)):C;
 const usadas=()=>[...Object.values(rep.misa),...rep.secciones.flatMap(s=>s.canciones)];
 const azar=(l,u)=>{const d=l.filter(c=>!u.includes(c.id)),b=d.length?d:l;return b.length?b[Math.floor(Math.random()*b.length)].id:null};
@@ -283,10 +301,10 @@ function clic(e){
   else if(d.copy!=null)copiar();
   else if(d.alet!=null){
     if(Object.keys(rep.misa).length&&!confirm('Esto reemplaza las canciones elegidas. \u00bfContinuar?'))return;
-    const nm={};MOM.forEach(([id])=>{const x=azar(candMom(id),Object.values(nm));if(x)nm[id]=x});rep.misa=nm;ok();
+    const nm={};MOM.forEach(([id])=>{const x=azar(candPlano(id),Object.values(nm));if(x)nm[id]=x});rep.misa=nm;ok();
   }
   else if(d.pick)elegir(MOM.find(m=>m[0]===d.pick)[1],candMom(d.pick),id=>{rep.misa[d.pick]=id;ok()});
-  else if(d.rnd){const id=azar(candMom(d.rnd),usadas());if(!id)return alert('No hay canciones con esa etiqueta.');rep.misa[d.rnd]=id;ok()}
+  else if(d.rnd){const id=azar(candPlano(d.rnd),usadas());if(!id)return alert('No hay canciones con esa etiqueta.');rep.misa[d.rnd]=id;ok()}
   else if(d.rm){delete rep.misa[d.rm];ok()}
   else if(d.sadd!=null){rep.secciones.push({id:rand(),nombre:'',tag:'',canciones:[]});ok()}
   else if(d.sdel){const an=anclas(),prev=an[an.indexOf(d.sdel)-1]||'ini';Object.values(rep.textos||{}).forEach(t=>{if(t.despues===d.sdel)t.despues=prev});rep.secciones=rep.secciones.filter(s=>s.id!==d.sdel);ok()}   // sus textos pasan al bloque anterior
@@ -463,14 +481,26 @@ function entra(e){
   else if(t.dataset.st&&e.type==='change'){sec(t.dataset.st).tag=t.value;guarda()}
 }
 
+// elegir(titulo, cands, cb): ventana para elegir una canci\u00f3n.
+//   cands = lista de canciones, o {tiempo, esp, gen} (TIEMPOS, ver candMom): se muestran dos grupos con encabezado,
+//   primero las del tiempo y debajo las de \u00abTiempo Ordinario\u00bb para que se vea que no son de ese tiempo.
 function elegir(titulo,cands,cb){
+  const doble=!Array.isArray(cands);
   let todas=false,q='';
   const o=modal('<div id="el2"></div>'),z=$('#el2',o);
+  const enc=x=>`<div style="margin:14px 0 4px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--oro-texto)">${esc(x)}</div>`;
   const p=()=>{
-    const k=q.toLowerCase(),l=(todas?C:cands).filter(c=>c.titulo.toLowerCase().includes(k)).sort((a,b)=>a.titulo.localeCompare(b.titulo));
+    const k=q.toLowerCase(),bus=l=>l.filter(c=>c.titulo.toLowerCase().includes(k)).sort((a,b)=>a.titulo.localeCompare(b.titulo));
+    const fila=c=>`<button class="fila" data-s="${c.id}">${esc(c.titulo)}${alb(c)?`<small>${esc(alb(c))}</small>`:''}</button>`;
+    let cuerpo;
+    if(doble&&!todas){
+      const e=bus(cands.esp),g=bus(cands.gen);
+      cuerpo=enc(cands.tiempo)+(e.map(fila).join('')||`<p class="vac">${cands.esp.length?'Ninguna coincide con la b\u00fasqueda.':'A\u00fan no hay canciones de este momento para '+esc(cands.tiempo)+'.'}</p>`)
+            +enc('Tiempo Ordinario')+(g.map(fila).join('')||`<p class="vac">${cands.gen.length?'Ninguna coincide con la b\u00fasqueda.':'No hay canciones ordinarias para este momento.'}</p>`);
+    }else cuerpo=bus(todas?C:doble?[...cands.esp,...cands.gen]:cands).map(fila).join('')||'<p class="vac">No hay canciones para elegir.</p>';
     z.innerHTML=`<div class="mh"><h2>${esc(titulo)}</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div><input id="bq" type="search" placeholder="Buscar canci\u00f3n" aria-label="Buscar canci\u00f3n" value="${esc(q)}" style="width:100%" autocomplete="off">`
       +(cands!==C?`<label class="chk"><input type="checkbox" id="vt" ${todas?'checked':''}> Ver todas las canciones</label>`:'')
-      +`<div class="lista2">${l.map(c=>`<button class="fila" data-s="${c.id}">${esc(c.titulo)}${alb(c)?`<small>${esc(alb(c))}</small>`:''}</button>`).join('')||'<p class="vac">No hay canciones para elegir.</p>'}</div>`;
+      +`<div class="lista2">${cuerpo}</div>`;
   };
   p();
   o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.cx!=null)o.remove();else if(b.dataset.s){o.remove();cb(b.dataset.s)}};

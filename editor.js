@@ -30,6 +30,7 @@
 // =====================================================================
 import {$,esc,guardar,crear,modal,puedeEditarAlbum} from "./base.js";
 import {E} from "./estado.js";
+import {asegurarTiempos} from "./etiquetas.js";   // TIEMPOS: crea las etiquetas de tiempo lit\u00fargico si faltan
 import {ix,MAY,MEN,tokensAcorde,tokensMarcado,nuevaRaiz,usaSostenidos,transponerChars} from "./musica.js";
 import {FIJAS,PROPOR,cssFuente,OKC,plano,colorOk,CT,CH,svgI,UNDO,REDO,AL_L,AL_C,AL_R,AL_J,IND,OUTD,FIND,BRUSH,MARK} from "./formato.js";
 
@@ -97,7 +98,7 @@ html:has(#editor.ed),html:has(#editor.ed) body{overflow:hidden}
 .et .lista label:hover{background:#e1e6f2}
 .et .lista label:has(input:checked){background:#1F2A4D;color:#fff}
 .et:has(.lista:not([hidden])) #eta{background:#1F2A4D;color:#fff}
-.et .lista{min-width:240px;position:absolute;top:100%;left:0;background:#fff;box-shadow:0 2px 10px #0003;border-radius:10px;padding:6px;z-index:5;max-height:260px;overflow:auto;white-space:nowrap}.et .lista label{display:block;padding:3px 6px}`;
+.et .lista{min-width:240px;position:absolute;top:100%;left:0;background:#fff;box-shadow:0 2px 10px #0003;border-radius:10px;padding:6px;z-index:5;max-height:260px;overflow:auto;white-space:nowrap}.et .lista label{display:block;padding:3px 6px}.et .lista .eg{font:700 11px sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#6b7390;padding:8px 6px 2px}.et .lista .eg:first-child{padding-top:2px}.et .box input{text-overflow:ellipsis}.et .box input::placeholder{text-overflow:ellipsis}`;
 document.head.append(st);
 
 // ---------- HERRAMIENTAS DE TEXTO (no dependen del editor abierto) ----------
@@ -140,7 +141,8 @@ const tieneAc=ls=>(ls||[]).some(l=>l.r.some(r=>r.k));   // ¿la hoja tiene al me
 export function abrir(s,alCerrar,opc={}){
   if(ed)forzarCierre();
   const soloLectura=!!opc.soloLectura;                       // true = nadie guarda nada desde esta ventana
-  const A=E.albumes.filter(puedeEditarAlbum),T=E.etiquetas;   // álbumes donde se puede mover esta canción (el suyo ya está permitido) y etiquetas
+  const A=E.albumes.filter(puedeEditarAlbum);   // álbumes donde se puede mover esta canción (el suyo ya está permitido)
+  if(!soloLectura)asegurarTiempos();            // TIEMPOS: las etiquetas se leen siempre de E.etiquetas (así aparecen las recién creadas)
   ed={titulo:'',tono:'',tonoAct:'',etiquetas:[],acordes:{},ac:null,cc:{},intro:'',interludios:[],final:null,fuente:'',fuenteA:'',lh:0,...structuredClone(s)};
   if(!ed.tonoAct)ed.tonoAct=ed.tono;
   ed.albumId=ed.albumId||A[0]?.id;
@@ -149,10 +151,20 @@ export function abrir(s,alCerrar,opc={}){
   let modo='letra',verEt=false,eq='',rango=null,rangoCol=null,modoAcorde=false,pincel=null,pend=null,zoom=100,plegada=false,popAb=null,uc='#B3261E',uh='#FFF176',ancla=null,inicial='',base='',teniaAcordes=false;
   // rango: la última selección hecha dentro de la hoja (con o sin texto). pend: formato «pendiente» para lo que escribas sin selección.
   const ov=document.createElement('div');ov.id='editor';ov.className='ed';document.body.append(ov);
-  const nom=i=>T.find(t=>t.id===i)?.nombre||'';
-  const filtra=()=>T.filter(t=>t.nombre.toLowerCase().includes(eq.toLowerCase()));
-  const listaEt=()=>filtra().map(t=>`<label><input type="checkbox" value="${t.id}" ${ed.etiquetas.includes(t.id)?'checked':''}> ${esc(t.nombre)}</label>`).join('')||'<small style="padding:6px;display:block;color:#6b7390">No hay etiquetas con ese nombre</small>';
-  const resumen=()=>{const n=ed.etiquetas.map(nom).filter(Boolean);return n.length?(n.length>1?'Varios':n[0]):'Sin etiqueta'};
+  // ===== TIEMPOS · desplegable de etiquetas agrupado (Momentos de la misa · Tiempos lit\u00fargicos · Otros) =====
+  const GRUPOS_ET=[['misa','Momentos de la misa'],['tiempo','Tiempos lit\u00fargicos'],['otro','Otros']];
+  const grupoEt=t=>t.grupo==='otro'?'otro':t.grupo==='tiempo'?'tiempo':'misa';   // las viejas (sin grupo) son de misa
+  const filtra=()=>GRUPOS_ET.flatMap(([g])=>E.etiquetas.filter(t=>grupoEt(t)===g&&t.nombre.toLowerCase().includes(eq.toLowerCase())));
+  const listaEt=()=>{const l=filtra();return GRUPOS_ET.map(([g,tit])=>{const x=l.filter(t=>grupoEt(t)===g);
+    return x.length?`<div class="eg">${tit}</div>`+x.map(t=>`<label><input type="checkbox" value="${t.id}" ${ed.etiquetas.includes(t.id)?'checked':''}> ${esc(t.nombre)}</label>`).join(''):''}).join('')||'<small style="padding:6px;display:block;color:#6b7390">No hay etiquetas con ese nombre</small>'};
+  // Texto del cuadro: \u00abCanto de entrada \u00b7 Adviento\u00bb; con m\u00e1s, \u00ab\u2026 +1\u00bb. En celular solo la primera y \u00ab+N\u00bb.
+  const resumen=()=>{
+    const n=GRUPOS_ET.flatMap(([g])=>E.etiquetas.filter(t=>grupoEt(t)===g&&ed.etiquetas.includes(t.id))).map(t=>t.nombre);
+    if(!n.length)return'Sin etiqueta';
+    const ver=matchMedia('(max-width:760px)').matches?1:2;
+    return n.slice(0,ver).join(' \u00b7 ')+(n.length>ver?' +'+(n.length-ver):'');
+  };
+  // ===== FIN TIEMPOS =====
   const refEt=()=>{const i=$('#eq',ov),l=ov.querySelector('.lista');if(i)i.placeholder=resumen();if(l)l.innerHTML=listaEt()};
   const alterna=(id,on)=>{ed.etiquetas=on?[...new Set([...ed.etiquetas,id])]:ed.etiquetas.filter(x=>x!==id);refEt()};
   // ================= 1. HERRAMIENTAS BÁSICAS =================
@@ -703,7 +715,7 @@ export function abrir(s,alCerrar,opc={}){
     rangoCol=v&&!v.collapsed&&le.contains(v.commonAncestorContainer)?v.cloneRange():null},true);
   const restauraSel=()=>{if(!rangoCol)return;const x=getSelection();x.removeAllRanges();x.addRange(rangoCol);rango=rangoCol.cloneRange();rangoCol=null};
   ov.onmousedown=e=>{if(e.target.closest('.fb'))e.preventDefault()};   // los botones no le quitan la selección al texto
-  ov.onfocusin=e=>{if(e.target.id==='eq'){verEt=true;const l=ov.querySelector('.lista');if(l)l.hidden=false}
+  ov.onfocusin=e=>{if(e.target.id==='eq'){verEt=true;const l=ov.querySelector('.lista');if(l)l.hidden=false;refEt()}
     else if(e.target.id==='sz')e.target.select();
     else if(e.target.id==='le')marcarBotones()};
   ov.addEventListener('focusout',e=>{if(e.target.id==='sz')setTimeout(()=>{if(ed)mostrarTam(true)},0)});
@@ -759,7 +771,7 @@ export function abrir(s,alCerrar,opc={}){
   ov.onclick=e=>{
     const tg=e.target;
     if(tg.closest('.et')){
-      if(tg.closest('#eta')){verEt=!verEt;ov.querySelector('.lista').hidden=!verEt}
+      if(tg.closest('#eta')){verEt=!verEt;ov.querySelector('.lista').hidden=!verEt;if(verEt)refEt()}
       return}
     const pb=tg.closest('[data-pop]');
     if(pb){popAb=popAb===pb.dataset.pop?null:pb.dataset.pop;ov.querySelectorAll('.pp').forEach(x=>x.hidden=x.dataset.pp!==popAb);if(popAb==='ton')refTono();if(popAb==='sz')marcaTam();if(popAb)colocaPop(popAb);return}
