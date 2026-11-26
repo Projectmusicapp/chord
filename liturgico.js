@@ -237,13 +237,17 @@ export function infoLiturgica(fecha,codigo=''){
   ents.forEach((e,i)=>{e.i=i;e.etiqueta=e.rango==='T'?'':ETIQUETA[e.rango]});
   ents.sort((a,b)=>(a.p-b.p)||(a.i-b.i));                          // empate: se respeta el orden de arriba
   const principal=ents[0];
+  // Una celebración menor no se celebra el día de una mayor (p. ej. una memoria en domingo). Solo quedan:
+  // las de igual rango, las memorias libres en una feria, y las solemnidades que caen en un día mayor (se anotan, sin trasladar).
+  const impedida=e=>!e.temporal&&e.p>principal.p&&!(principal.p===1&&e.rango==='S')&&!(principal.temporal&&principal.p>=4.5);
+  const todas=ents.filter(e=>e.temporal||!impedida(e));
   return {
     fecha:d,ymd:aYmd(d),
     tiempo:t.tiempo,semana:t.semana,nombreDia:t.nombre,
     domingo:d.getDay()===0,
     principal,                                                     // la celebración que manda ese día
-    otros:ents.slice(1).filter(e=>!e.temporal),                    // memorias libres u otras anotaciones
-    todas:ents,
+    otros:todas.filter(e=>e!==principal&&!e.temporal),             // memorias libres u otras anotaciones
+    todas,
     color:principal.color,
     destacado:principal.p<=4||d.getDay()===0                      // solemnidad, fiesta, día mayor o domingo
   };
@@ -253,7 +257,7 @@ export function infoLiturgica(fecha,codigo=''){
 //   opciones: {domingos, solemnidades, fiestas, libres, semana}  (true = mostrar; por defecto todo)
 //   «domingos» = marcar los domingos en la celda del calendario · «solemnidades» = solemnidades y conmemoraciones
 //   «fiestas» = fiestas y memorias obligatorias · «libres» = memorias libres · «semana» = la semana del tiempo.
-// Devuelve: {tiempo, semana, titulo, etiqueta, otros, destacado, rotulado, domingo, color, principal}
+// Devuelve: {tiempo, semana, titulo, rotulo, etiqueta, otros, destacado, rotulado, domingo, color, principal}
 //   · tiempo  = «Tiempo Ordinario»          · semana = «Semana 34» (no en domingos: ya lo dice el título)
 //   · titulo  = «34.º domingo» o el nombre de la celebración; null en una feria común
 //   · color   = entrada de COLORES (si se oculta una fiesta, el color es el del tiempo)
@@ -262,14 +266,18 @@ export function vistaDia(i,o={}){
   const visible=e=>e.temporal||(e.rango==='S'||e.rango==='C'?op.solemnidades:e.rango==='L'?op.libres:op.fiestas);
   const lista=i.todas.filter(visible),p=lista[0];
   const sem=i.semana&&/^Semana/.test(i.semana)&&!(i.domingo&&/^Semana \d/.test(i.semana))?i.semana:null;
+  const rotulado=!!(p.temporal?p.corto:p.nombre)&&(p.p<=4||i.domingo||p.rango==='M')&&!(p.temporal&&i.domingo&&!op.domingos);
+  const libre=lista.find(e=>e.rango==='L');                      // (solo existe si «libres» está activo)
+  const titulo=p.temporal?(p.corto||null):p.nombre;
   return {
     tiempo:i.tiempo,
     semana:op.semana?sem:null,
-    titulo:p.temporal?(p.corto||null):p.nombre,
+    titulo,
+    rotulo:rotulado?titulo:(libre?libre.nombre:null),            // texto para la celda del calendario (null = celda limpia)
     etiqueta:p.temporal?'':p.etiqueta,
     otros:lista.filter(e=>!e.temporal&&e!==p),
     destacado:p.p<=4||i.domingo,                                   // para listas cortas (Inicio): domingos, solemnidades y fiestas
-    rotulado:!!(p.temporal?p.corto:p.nombre)&&(p.p<=4||i.domingo||p.rango==='M')&&!(p.temporal&&i.domingo&&!op.domingos),   // para rotular la celda del calendario: además, memorias obligatorias; el domingo solo si se pidió
+    rotulado,                                                      // ¿se rotula la celda? solemnidad, fiesta, memoria obligatoria o día mayor; el domingo solo si domingos=true
     domingo:i.domingo,
     color:COLORES[p.color],
     principal:p
