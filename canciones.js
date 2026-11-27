@@ -18,7 +18,7 @@
 import {$,esc,guardar,crear,eliminar,imagen,vistas,ic,modal,puedeEditar,esNivelAdmin,puedeEditarAlbum} from "./base.js";
 import {E,alCambiar} from "./estado.js";
 import {abrir,editando,forzarCierre} from "./editor.js";
-import {etiquetas} from "./etiquetas.js";
+// (el botón «Etiquetas» pasó al panel «Configuración» de la cabecera; ver usuarios.js y etiquetas.js)
 import "./hoja.js";
 
 // ---------------------------------------------------------------------
@@ -230,7 +230,7 @@ function pintarMenu(){const m=$('.vmenu');if(m){m.innerHTML=htmlMenu();m.hidden=
 function montar(){
   el.innerHTML=`<div id="canc"><div class="barra">
       <div class="buscar" role="search"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="q" type="text" inputmode="search" enterkeyhint="search" placeholder="Buscar por nombre, etiqueta o letra" aria-label="Buscar canciones" value="${esc(busqueda)}" autocomplete="off"><button class="x" id="qx" aria-label="Borrar b\u00fasqueda" ${busqueda?'':'hidden'}>&times;</button></div>
-      ${puedeEditar()?`<button id="na">${ic('pls',16)} Nuevo \u00e1lbum</button><button id="nc">${ic('pls',16)} Nueva canci\u00f3n</button><button class="sec" id="et">Etiquetas</button>`:''}
+      ${puedeEditar()?`<button id="na">${ic('pls',16)} Nuevo \u00e1lbum</button><button id="nc">${ic('pls',16)} Nueva canci\u00f3n</button>`:''}
       <span class="vbox"><button class="sec" id="vista" aria-haspopup="true" aria-expanded="false">Vista &#9662;</button><div class="vmenu" hidden></div></span></div>
     <div id="contenido"></div><input type="file" id="ff" accept="image/*" hidden></div>`;
   const raiz=$('#canc');
@@ -293,7 +293,6 @@ function alHacerClic(e){
     if(!albumId)return alert('Primero crea un \u00e1lbum.');
     return abrir({albumId},pintarContenido);
   }
-  if(t.closest('#et'))return etiquetas();
   if(t.closest('#vista')){menuAbierto=!menuAbierto;return pintarMenu()}
   const opcion=t.closest('[data-p]');                                  // botones del menú «Vista»
   if(opcion){const [clave,valor]=opcion.dataset.p.split(':');PREF[clave]=valor;guardarPreferencias();pintarMenu();return pintarContenido()}

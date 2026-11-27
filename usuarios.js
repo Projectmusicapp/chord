@@ -12,7 +12,7 @@
 //                de la biblioteca general, crear cuentas de cualquier nivel
 //                y cambiar el nivel de cualquier cuenta (incluso degradar a
 //                otro Administrador a Editor). Su Editor también cambia niveles (menos el de Administrador).
-//   editor ..... solo se crea desde Configuración (nunca por autorregistro).
+//   editor ..... solo se crea desde Usuarios (nunca por autorregistro).
 //     editorDe:'admin'   Editor del administrador: hace todo lo que el
 //                        Administrador, menos editar/eliminar a un Administrador
 //                        ni crear Administradores. Trabaja en el espacio general.
@@ -45,6 +45,7 @@
 // =====================================================================
 import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,esAdministrador,puedeEditar,configActual,hoyLargo,auth,cambiarMiClave,crearCuentaAuth,crearCuentaComoAdmin,enviarVerificacion,definirApariencia,refrescarCabecera,recargarUsuarioAuth,GENERAL,esNivelGeneral,rolesDe,espaciosDe,nivelEn,camposDeRoles,nivelActivo,espacioActual,ambitoActual,cambiarEspacio} from "./base.js";
 import {ventana as abrirRespaldo} from "./respaldo.js";
+import "./etiquetas.js";   // PANEL: registra la pantalla «Etiquetas» (#etiquetas), que ya no se abre desde Canciones
 import {E,alCambiar} from "./estado.js";
 import {misionesCargadas,alCambiarMisiones,listaMisiones,misionPorId,etiquetaMision,PAISES,alfa,selectorBandera,activarSelectores,banderaHtml} from "./misiones.js";
 import {tarjetaLiturgica,alCambiarLiturgia} from "./liturgico.js";   // tiempo litúrgico (cuadro de Inicio)
@@ -78,6 +79,25 @@ header .dd-usuario .nombre .nm{overflow:hidden;text-overflow:ellipsis;white-spac
 header .dd-usuario button{background:transparent;color:var(--tx);justify-content:flex-start;text-align:left;min-height:38px}
 header .dd-usuario button:hover{background:var(--capa);filter:none}
 @media(max-width:480px){header .btn-usuario{max-width:64px;padding:0 8px;justify-content:center}header .btn-usuario .nm{display:none}}
+/* ===== PANEL «Configuración»: se despliega desde la derecha a todo el alto ===== */
+.pcfg-capa{position:fixed;inset:0;z-index:60;visibility:hidden;pointer-events:none;transition:visibility 0s linear .25s}
+.pcfg-capa.abierta{visibility:visible;pointer-events:auto;transition-delay:0s}
+.pcfg-fondo{position:absolute;inset:0;background:#0b1126;opacity:0;transition:opacity .25s ease}
+.pcfg-capa.abierta .pcfg-fondo{opacity:.5}
+.pcfg{position:absolute;top:0;right:0;bottom:0;width:min(320px,88vw);background:var(--blanco);box-shadow:-10px 0 34px #1f2a4d40;display:flex;flex-direction:column;overflow-y:auto;transform:translateX(100%);transition:transform .25s ease;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) 0}
+.pcfg-capa.abierta .pcfg{transform:none}
+.pcfg-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px 6px}
+.pcfg-cab h2{margin:0;font-size:20px}
+.pcfg-per{display:flex;align-items:center;gap:12px;padding:12px 18px 16px;border-bottom:1px solid var(--linea);font-weight:700;color:var(--tx);min-width:0}
+.pcfg-per .avw{display:inline-flex;flex:none}
+.pcfg-per .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pcfg-ops{display:flex;flex-direction:column;gap:2px;padding:10px;flex:1}
+.pcfg-ops button{background:transparent;color:var(--tx);justify-content:flex-start;text-align:left;min-height:46px;padding:8px 12px;font-weight:600;width:100%}
+.pcfg-ops button:hover{background:var(--capa);filter:none}
+.pcfg-ops button[aria-current=true]{background:var(--oro-claro);color:var(--azul);font-weight:800}
+.pcfg-ops .pcfg-sal{margin-top:auto}
+@media(max-width:480px){.pcfg{width:min(340px,90vw)}}
+@media(prefers-reduced-motion:reduce){.pcfg,.pcfg-fondo{transition:none}}
 .inicio{display:flex;flex-direction:column;gap:24px}
 .bienvenida{background:linear-gradient(135deg,var(--azul),var(--azul-2));border-radius:var(--r-xl);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;box-shadow:var(--sombra-2)}
 .bienvenida h1{color:#fff;margin:0}
@@ -238,37 +258,64 @@ function puedeEliminarCuenta(u,actor){
 
 // avatar: foto de perfil redonda; si no hay foto, la inicial del nombre.
 const avatar=(u,s=28)=>{const t=`width:${s}px;height:${s}px;font-size:${Math.round(s*.45)}px`;return u.foto?`<img class="av" style="${t}" src="${u.foto}" alt="">`:`<span class="av" style="${t}" aria-hidden="true">${esc((u.nombre||u.correo||'?').trim().charAt(0).toUpperCase())}</span>`};
+// PANEL: actualiza foto y nombre (botón de la cabecera y parte de arriba del panel) cuando la cuenta cambia
 function pintarCuentaEnMenu(u){
-  const c=document.querySelector('header .menu-usuario');if(!c)return;
   const nm=u.nombre||u.correo||'';
-  c.querySelector('.btn-usuario .avw').innerHTML=avatar(u,28);
-  c.querySelector('.btn-usuario .nm').textContent=nm;
-  c.querySelector('.dd-usuario .nombre .avw').innerHTML=avatar(u,36);
-  c.querySelector('.dd-usuario .nombre .nm').textContent=nm;
+  const b=document.querySelector('header .btn-usuario');
+  if(b){b.querySelector('.avw').innerHTML=avatar(u,28);b.querySelector('.nm').textContent=nm}
+  const p=document.querySelector('#pcfg .pcfg-per');
+  if(p){p.querySelector('.avw').innerHTML=avatar(u,44);p.querySelector('.nm').textContent=nm}
 }
 
-// ---------- Menú de usuario en la cabecera: nombre, Mi cuenta, Configuración y Salir ----------
+// ---------- Menú de la cuenta: botón con foto y nombre en la cabecera + panel lateral «Configuración» ----------
+// El panel se despliega desde la derecha ocupando todo el alto. Opciones: Mi cuenta, Usuarios, Etiquetas y Salir.
+//   Usuarios y Etiquetas solo las ven quienes pueden editar (puedeEditar). Se cierra con la X, tocando fuera o con Esc.
 // (no van en la barra de navegación: son acciones de la cuenta, no secciones de contenido)
+const PERSONA='<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>';
+const ETIQ='<path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/>';
+const sv=(p,s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+let alEscape=null;
 export function montarMenuUsuario(salir){
   const actor=sesion();
   const header=document.querySelector('header');
   if(!header||!actor||header.querySelector('.menu-usuario'))return;
+  const viejo=document.getElementById('pcfg');if(viejo)viejo.remove();
+  if(alEscape)document.removeEventListener('keydown',alEscape);
+  const nombre=esc(actor.nombre||actor.correo);
   const cont=document.createElement('div');
   cont.className='menu-usuario';
-  cont.innerHTML=`<button class="btn-usuario" aria-haspopup="true" aria-expanded="false"><span class="avw">${avatar(actor,28)}</span><span class="nm">${esc(actor.nombre||actor.correo)}</span> &#9662;</button>
-    <div class="dd-usuario" hidden>
-      <div class="nombre"><span class="avw">${avatar(actor,36)}</span><span class="nm">${esc(actor.nombre||actor.correo)}</span></div>
-      <button data-mc>${ic('usr',15)} Mi cuenta</button>
-      ${puedeEditar()?`<button data-cfg>${ic('cfg',15)} Configuración</button>`:''}
-      <button data-sal>${ic('out',15)} Salir</button>
-    </div>`;
-  const boton=cont.querySelector('.btn-usuario'),dd=cont.querySelector('.dd-usuario');
-  const cerrar=()=>{dd.hidden=true;boton.setAttribute('aria-expanded','false')};
-  boton.onclick=()=>{const abrir=dd.hidden;dd.hidden=!abrir;boton.setAttribute('aria-expanded',String(abrir))};
-  document.addEventListener('click',e=>{if(!dd.hidden&&!cont.contains(e.target))cerrar()});
-  cont.querySelector('[data-mc]').onclick=()=>{cerrar();location.hash='cuenta'};
-  const cfgBtn=cont.querySelector('[data-cfg]');if(cfgBtn)cfgBtn.onclick=()=>{cerrar();location.hash='usuarios'};
-  cont.querySelector('[data-sal]').onclick=()=>{cerrar();salir()};
+  cont.innerHTML=`<button class="btn-usuario" aria-haspopup="dialog" aria-expanded="false" aria-controls="pcfg"><span class="avw">${avatar(actor,28)}</span><span class="nm">${nombre}</span> &#9662;</button>`;
+  const capa=document.createElement('div');
+  capa.id='pcfg';capa.className='pcfg-capa';
+  capa.innerHTML=`<div class="pcfg-fondo" data-pc></div>
+    <aside class="pcfg" role="dialog" aria-modal="true" aria-label="Configuración">
+      <div class="pcfg-cab"><h2>Configuración</h2><button class="ic" data-pc aria-label="Cerrar">${ic('x')}</button></div>
+      <div class="pcfg-per"><span class="avw">${avatar(actor,44)}</span><span class="nm">${nombre}</span></div>
+      <nav class="pcfg-ops" aria-label="Configuración"></nav>
+    </aside>`;
+  const boton=cont.querySelector('.btn-usuario'),ops=capa.querySelector('.pcfg-ops');
+  // las opciones se arman al abrir: lo que ves depende del espacio de trabajo activo
+  const armar=()=>{
+    const ed=puedeEditar(),h=location.hash.slice(1),ac=x=>`aria-current="${h===x}"`;
+    ops.innerHTML=`<button data-mc ${ac('cuenta')}>${sv(PERSONA)} Mi cuenta</button>`
+      +(ed?`<button data-us ${ac('usuarios')}>${ic('usr',18)} Usuarios</button><button data-et ${ac('etiquetas')}>${sv(ETIQ)} Etiquetas</button>`:'')
+      +`<button class="pcfg-sal" data-sal>${ic('out',18)} Salir</button>`;
+  };
+  const abrir=()=>{armar();capa.classList.add('abierta');boton.setAttribute('aria-expanded','true');document.body.style.overflow='hidden';capa.querySelector('.pcfg-cab .ic').focus()};
+  const cerrar=volver=>{if(!capa.classList.contains('abierta'))return;capa.classList.remove('abierta');boton.setAttribute('aria-expanded','false');document.body.style.overflow='';if(volver)boton.focus()};
+  boton.onclick=()=>capa.classList.contains('abierta')?cerrar(true):abrir();
+  capa.onclick=e=>{
+    const b=e.target.closest('button,[data-pc]');if(!b)return;const d=b.dataset;
+    if(d.pc!=null)cerrar(true);
+    else if(d.mc!=null){cerrar(false);location.hash='cuenta'}
+    else if(d.us!=null){cerrar(false);location.hash='usuarios'}
+    else if(d.et!=null){cerrar(false);location.hash='etiquetas'}
+    else if(d.sal!=null){cerrar(false);salir()}
+  };
+  alEscape=e=>{if(e.key==='Escape')cerrar(true)};
+  document.addEventListener('keydown',alEscape);
+  addEventListener('hashchange',()=>cerrar(false));
+  document.body.append(capa);
   header.append(cont);
   montarEspacios(header,cont);
 }
@@ -378,7 +425,7 @@ function pintar(){
 // Vista de una cuenta Misión/Editor de misión: solo su propio equipo.
 function pintarEquipo(actor){
   const lista=cuentasVisibles(actor).slice().sort((a,b)=>(a.nombre||a.correo).localeCompare(b.nombre||b.correo,'es'));
-  return `<div class="ch2"><h1>Configuración</h1><button data-nu>${ic('pls',16)} Nueva cuenta</button></div>
+  return `<div class="ch2"><h1>Usuarios</h1><button data-nu>${ic('pls',16)} Nueva cuenta</button></div>
     <div class="ulist">${lista.map(u=>fila(u,actor)).join('')||'<p class="vacio">Aún no hay cuentas aquí.</p>'}</div>`;
 }
 
@@ -390,7 +437,7 @@ function pintarAdmin(actor){
   const misiones=listaMisiones();
   const h=huerfanos();
   const cfg=configActual();
-  return `<div class="ch2"><h1>Configuración</h1></div>
+  return `<div class="ch2"><h1>Usuarios</h1></div>
 
     <section class="seccfg">
       <div class="ch2"><h2>${ic('usr',19)} Usuarios</h2><button data-nu>${ic('pls',16)} Nueva cuenta</button></div>
