@@ -79,7 +79,7 @@ header .dd-usuario .nombre .nm{overflow:hidden;text-overflow:ellipsis;white-spac
 header .dd-usuario button{background:transparent;color:var(--tx);justify-content:flex-start;text-align:left;min-height:38px}
 header .dd-usuario button:hover{background:var(--capa);filter:none}
 @media(max-width:480px){header .btn-usuario{max-width:64px;padding:0 8px;justify-content:center}header .btn-usuario .nm{display:none}}
-/* ===== PANEL «Configuración»: se despliega desde la derecha a todo el alto ===== */
+/* ===== PANEL «Configuración»: se despliega desde la derecha a todo el alto (azul en PC, blanco en celular) ===== */
 .pcfg-capa{position:fixed;inset:0;z-index:60;visibility:hidden;pointer-events:none;transition:visibility 0s linear .25s}
 .pcfg-capa.abierta{visibility:visible;pointer-events:auto;transition-delay:0s}
 .pcfg-fondo{position:absolute;inset:0;background:#0b1126;opacity:0;transition:opacity .25s ease}
@@ -98,6 +98,13 @@ header .dd-usuario button:hover{background:var(--capa);filter:none}
 .pcfg-ops .pcfg-sal{margin-top:auto}
 @media(max-width:480px){.pcfg{width:min(340px,90vw)}}
 @media(prefers-reduced-motion:reduce){.pcfg,.pcfg-fondo{transition:none}}
+@media(min-width:481px){.pcfg{background:#182243;color:#DDE3F5}
+.pcfg-cab h2{color:#fff}
+.pcfg-cab .ic{background:#ffffff1f;color:#fff}
+.pcfg-per{color:#fff;border-bottom-color:#ffffff24}
+.pcfg-ops button{color:#DDE3F5}
+.pcfg-ops button:hover{background:#ffffff14}
+.pcfg-ops button[aria-current=true],.pcfg-ops button[aria-current=true]:hover{background:var(--oro);color:var(--azul)}}
 .inicio{display:flex;flex-direction:column;gap:24px}
 .bienvenida{background:linear-gradient(135deg,var(--azul),var(--azul-2));border-radius:var(--r-xl);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;box-shadow:var(--sombra-2)}
 .bienvenida h1{color:#fff;margin:0}
@@ -301,8 +308,8 @@ export function montarMenuUsuario(salir){
       +(ed?`<button data-us ${ac('usuarios')}>${ic('usr',18)} Usuarios</button><button data-et ${ac('etiquetas')}>${sv(ETIQ)} Etiquetas</button>`:'')
       +`<button class="pcfg-sal" data-sal>${ic('out',18)} Salir</button>`;
   };
-  const abrir=()=>{armar();capa.classList.add('abierta');boton.setAttribute('aria-expanded','true');document.body.style.overflow='hidden';capa.querySelector('.pcfg-cab .ic').focus()};
-  const cerrar=volver=>{if(!capa.classList.contains('abierta'))return;capa.classList.remove('abierta');boton.setAttribute('aria-expanded','false');document.body.style.overflow='';if(volver)boton.focus()};
+  const abrir=()=>{armar();const barra=innerWidth-document.documentElement.clientWidth;capa.classList.add('abierta');boton.setAttribute('aria-expanded','true');document.body.style.overflow='hidden';if(barra>0)document.body.style.paddingRight=barra+'px';capa.querySelector('.pcfg-cab .ic').focus({preventScroll:true})};   // el ancho de la barra de scroll se reserva para que la página no se corra (temblor)
+  const cerrar=volver=>{if(!capa.classList.contains('abierta'))return;capa.classList.remove('abierta');boton.setAttribute('aria-expanded','false');document.body.style.overflow='';document.body.style.paddingRight='';if(volver)boton.focus({preventScroll:true})};
   boton.onclick=()=>capa.classList.contains('abierta')?cerrar(true):abrir();
   capa.onclick=e=>{
     const b=e.target.closest('button,[data-pc]');if(!b)return;const d=b.dataset;
