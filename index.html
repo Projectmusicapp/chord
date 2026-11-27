@@ -6,6 +6,18 @@
 <title>Músicapp</title>
 <meta name="description" content="Canciones, repertorios, calendario y escalas del ministerio de música.">
 <meta name="theme-color" content="#1F2A4D">
+<script>
+/* TEMA: aplica, antes de dibujar la página, el tema guardado en este dispositivo (modo, color y acordes) para que no parpadee.
+   No se usa en la ventana Compartir (#ver/). La cuenta lo confirma al entrar: ver «Tema» en usuarios.js. */
+(function(){try{
+  if(location.hash.indexOf('#ver/')===0)return;
+  var t=JSON.parse(localStorage.getItem('tema')||'null');if(!t)return;
+  var d=document.documentElement;
+  d.dataset.modo=(t.modo==='oscuro'||(t.modo==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches))?'oscuro':'claro';
+  d.dataset.color=t.color||'azul';
+  if(t.acordes)d.style.setProperty('--acorde',t.acordes);
+}catch(e){}})();
+</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23C58A2B'/%3E%3Cg fill='none' stroke='%231F2A4D' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M25 44V19l20-4v25'/%3E%3Ccircle cx='19' cy='44' r='6'/%3E%3Ccircle cx='39' cy='40' r='6'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">

@@ -35,7 +35,7 @@ escucharPropio('personas',l=>{P=l;avisar()});
 
 const st=document.createElement('style');
 st.textContent=`.mesc details{background:var(--capa);border-radius:var(--r-m);margin-bottom:8px}
-.mesc summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:12px 14px;font-weight:800;color:var(--azul);font-size:15.5px}
+.mesc summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:12px 14px;font-weight:800;color:var(--azul-tx);font-size:15.5px}
 .mesc summary::-webkit-details-marker{display:none}
 .mesc summary .chev{display:inline-flex;color:var(--gris);transition:transform .15s}
 .mesc details[open] summary .chev{transform:rotate(90deg)}
@@ -43,7 +43,7 @@ st.textContent=`.mesc details{background:var(--capa);border-radius:var(--r-m);ma
 .mesc .eqs{display:grid;gap:6px;padding:0 10px 10px}
 .mesc .eqs button{display:block;text-align:left;background:var(--blanco);color:var(--tx);border:1.5px solid var(--linea);padding:10px 12px;font-weight:700}
 .mesc .eqs button:hover{border-color:var(--linea-2);filter:none}
-.mesc .eqs button.on{border-color:var(--azul);box-shadow:inset 0 0 0 1px var(--azul)}
+.mesc .eqs button.on{border-color:var(--azul-tx);box-shadow:inset 0 0 0 1px var(--azul-tx)}
 .mesc .eqs button small{display:block;color:var(--gris);font-weight:500;margin-top:2px;line-height:1.35}
 .mesc .pie{display:flex;justify-content:space-between;gap:8px;margin-top:10px}
 .miembros{list-style:none;margin:0;padding:0;display:grid;gap:4px}

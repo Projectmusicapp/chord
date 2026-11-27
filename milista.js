@@ -41,7 +41,7 @@ st.textContent=`.ml-grid{display:grid;grid-template-columns:repeat(auto-fill,min
 .ml-sub{margin:6px 0 10px;color:var(--gris);font-size:13.5px}
 button.fila.ml-op{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
 .ml-ot{display:flex;flex-direction:column;min-width:0}.ml-ot small{color:var(--gris);font-weight:500;font-size:12.5px}
-button.fila.ml-op.ya{background:var(--oro-claro);color:var(--azul)}
+button.fila.ml-op.ya{background:var(--oro-claro);color:var(--azul-tx)}
 .ml-ck{flex:none;font-weight:800}
 /* celular: los botones de cambio de pantalla (Mi lista / Canciones) van centrados; solo para cuentas «solo ver» (clase solo-ver, ver base.js) */
 @media(max-width:760px){body.solo-ver #nav{display:flex;justify-content:center;gap:28px;flex:1 1 auto;min-width:0}

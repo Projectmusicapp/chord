@@ -56,20 +56,20 @@ const NIVELES={admin:'Administrador','editor-admin':'Editor del administrador','
 
 const st=document.createElement('style');
 st.textContent=`header .menu-usuario{position:relative;margin-left:auto}
-header .btn-usuario{background:#ffffff14;color:#DDE3F5;min-height:36px;padding:6px 12px;font-size:14px;flex:none;display:inline-flex;align-items:center;gap:6px;max-width:160px}
+header .btn-usuario{background:#ffffff14;color:#ffffffe0;min-height:36px;padding:6px 12px;font-size:14px;flex:none;display:inline-flex;align-items:center;gap:6px;max-width:160px}
 header .btn-usuario .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:110px}
-.av{width:28px;height:28px;border-radius:50%;object-fit:cover;flex:none;display:inline-grid;place-items:center;background:var(--oro);color:var(--azul);font-weight:800;line-height:1}
+.av{width:28px;height:28px;border-radius:50%;object-fit:cover;flex:none;display:inline-grid;place-items:center;background:var(--oro);color:var(--sobre-oro);font-weight:800;line-height:1}
 header .avw{display:inline-flex;flex:none}
 header .btn-usuario:hover{background:#ffffff26;filter:none}
 header .menu-espacio{position:relative;margin-left:auto}
 header .menu-espacio[hidden]{display:none}
 header .menu-espacio+.menu-usuario{margin-left:8px}
-header .btn-espacio{background:#ffffff14;color:#DDE3F5;min-height:36px;padding:6px 10px;font-size:14px;flex:none;display:inline-flex;align-items:center;gap:6px;max-width:150px}
+header .btn-espacio{background:#ffffff14;color:#ffffffe0;min-height:36px;padding:6px 10px;font-size:14px;flex:none;display:inline-flex;align-items:center;gap:6px;max-width:150px}
 header .btn-espacio .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:92px}
 header .btn-espacio:hover{background:#ffffff26;filter:none}
 header .dd-usuario .esp{display:flex;align-items:center;gap:8px;width:100%}
 header .dd-usuario .esp small{margin-left:auto;color:var(--gris);font-weight:500;white-space:nowrap}
-header .dd-usuario .esp[aria-current=true]{background:var(--oro-claro);color:var(--azul);font-weight:800}
+header .dd-usuario .esp[aria-current=true]{background:var(--oro-claro);color:var(--azul-tx);font-weight:800}
 .rfila{display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;flex-wrap:wrap}
 .rfila .fl2{margin:0;flex:1 1 150px;min-width:0}
 .rfila .ic{flex:none}
@@ -94,22 +94,35 @@ header .dd-usuario button:hover{background:var(--capa);filter:none}
 .pcfg-ops{display:flex;flex-direction:column;gap:2px;padding:10px;flex:1}
 .pcfg-ops button{background:transparent;color:var(--tx);justify-content:flex-start;text-align:left;min-height:46px;padding:8px 12px;font-weight:600;width:100%}
 .pcfg-ops button:hover{background:var(--capa);filter:none}
-.pcfg-ops button[aria-current=true]{background:var(--oro-claro);color:var(--azul);font-weight:800}
+.pcfg-ops button[aria-current=true]{background:var(--oro-claro);color:var(--azul-tx);font-weight:800}
 .pcfg-ops .pcfg-sal{margin-top:auto}
 @media(max-width:480px){.pcfg{width:min(340px,90vw)}}
 @media(prefers-reduced-motion:reduce){.pcfg,.pcfg-fondo{transition:none}}
-@media(min-width:481px){.pcfg{background:#182243;color:#DDE3F5}
+@media(min-width:481px){.pcfg{background:var(--panel);color:#ffffffe0}
 .pcfg-cab h2{color:#fff}
 .pcfg-cab .ic{background:#ffffff1f;color:#fff}
 .pcfg-per{color:#fff;border-bottom-color:#ffffff24}
-.pcfg-ops button{color:#DDE3F5}
+.pcfg-ops button{color:#ffffffe0}
 .pcfg-ops button:hover{background:#ffffff14}
-.pcfg-ops button[aria-current=true],.pcfg-ops button[aria-current=true]:hover{background:var(--oro);color:var(--azul)}}
+.pcfg-ops button[aria-current=true],.pcfg-ops button[aria-current=true]:hover{background:var(--oro);color:var(--sobre-oro)}}
+/* ===== TEMA: ventana de modo, color y acordes ===== */
+.tm-h{margin:20px 0 8px;font:800 12.5px var(--fuente);letter-spacing:.06em;text-transform:uppercase;color:var(--gris)}
+.tm-modos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tm-modos button,.tm-sw{background:var(--blanco);color:var(--tx);border:2px solid var(--linea);border-radius:var(--r-m);font-weight:700}
+.tm-modos button{flex-direction:column;gap:4px;padding:10px 6px;font-size:13px;min-height:62px}
+.tm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.tm-sw{justify-content:flex-start;padding:8px 12px;gap:10px;font-size:14px}
+.tm-pt{width:22px;height:22px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 2px #ffffff55,0 0 0 1px var(--linea-2)}
+.tm-modos button:hover,.tm-sw:hover{filter:none;background:var(--capa)}
+.tm-modos button[aria-pressed=true],.tm-sw[aria-pressed=true],.tm-modos button[aria-pressed=true]:hover,.tm-sw[aria-pressed=true]:hover{border-color:var(--oro);background:var(--oro-claro);color:var(--azul-tx)}
+.tm-prev{background:#fff;color:#1d2233;border-radius:var(--r-m);padding:12px 16px;margin-top:12px;font:16px/1.4 Arial,"Helvetica Neue",Helvetica,sans-serif;border:1px solid var(--linea)}
+.tm-prev .tm-ac{color:var(--acorde,#b3261e);font-weight:700;white-space:pre}
+.tm-nota{margin:14px 0 0;color:var(--gris);font-size:13px}
 .inicio{display:flex;flex-direction:column;gap:24px}
 .bienvenida{background:linear-gradient(135deg,var(--azul),var(--azul-2));border-radius:var(--r-xl);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;box-shadow:var(--sombra-2)}
 .bienvenida h1{color:#fff;margin:0}
-.bienvenida p{color:#C9D1EC;margin:8px 0 0;font-size:15px}
-.bienvenida .chip{background:var(--oro);color:var(--azul);font-weight:800;font-size:13px;padding:7px 16px;border-radius:999px;white-space:nowrap}
+.bienvenida p{color:#ffffffc7;margin:8px 0 0;font-size:15px}
+.bienvenida .chip{background:var(--oro);color:var(--sobre-oro);font-weight:800;font-size:13px;padding:7px 16px;border-radius:999px;white-space:nowrap}
 .col2{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
 .col2 .novedades{flex:999 1 560px;min-width:0}
 .col2 .barra-lateral{flex:1 1 280px;min-width:260px;display:flex;flex-direction:column;gap:18px}
@@ -120,7 +133,7 @@ header .dd-usuario button:hover{background:var(--capa);filter:none}
 .novedades .ulist .ufila{display:flex;align-items:flex-start;gap:14px;padding:13px 0;border-bottom:1px solid var(--linea);background:none;border-radius:0}
 .novedades .ulist .ufila:last-child{border-bottom:0}
 .novedades .nic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:none}
-.novedades .nic.cuenta{background:var(--capa);color:var(--azul)}
+.novedades .nic.cuenta{background:var(--capa);color:var(--azul-tx)}
 .novedades .nic.cancion{background:var(--oro-claro);color:var(--oro-texto)}
 .novedades .un{flex:1;min-width:0}
 .novedades .un b{display:block}
@@ -138,7 +151,7 @@ header .dd-usuario button:hover{background:var(--capa);filter:none}
 [data-vista=usuarios] .ufila .un{flex:1;min-width:160px}
 [data-vista=usuarios] .ufila b{display:block}
 [data-vista=usuarios] .ufila small{display:block;color:var(--gris);font-weight:500}
-[data-vista=usuarios] .rolchip{display:inline-block;background:var(--suave);color:var(--azul);border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:700}
+[data-vista=usuarios] .rolchip{display:inline-block;background:var(--suave);color:var(--azul-tx);border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:700}
 [data-vista=usuarios] .ufila.inactiva{opacity:.55}
 [data-vista=usuarios] .mb2{display:flex;gap:6px;flex-wrap:wrap}
 [data-vista=usuarios] .pend{display:inline-block;background:var(--oro-claro);color:var(--oro-texto);border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}
@@ -158,7 +171,7 @@ header .dd-usuario button:hover{background:var(--capa);filter:none}
 [data-vista=usuarios] .mtog[aria-expanded=true] .flecha{transform:rotate(90deg)}
 [data-vista=usuarios] .mcab{display:flex;align-items:center;gap:6px}
 [data-vista=usuarios] .mas{flex:none;width:36px;height:36px;min-height:0;padding:0;display:inline-grid;place-items:center;background:transparent;color:var(--gris);border:0;box-shadow:none;border-radius:50%;margin-left:auto}
-[data-vista=usuarios] .mas:hover,[data-vista=usuarios] .mas:focus-visible{filter:none;background:var(--suave);color:var(--azul)}
+[data-vista=usuarios] .mas:hover,[data-vista=usuarios] .mas:focus-visible{filter:none;background:var(--suave);color:var(--azul-tx)}
 .menu-pop{position:fixed;z-index:60;background:var(--blanco);border:1px solid var(--linea);border-radius:12px;box-shadow:var(--sombra-2);padding:6px;min-width:176px;display:grid;gap:2px}
 .menu-pop button{display:flex;align-items:center;gap:8px;width:100%;min-height:38px;padding:6px 10px;background:transparent;color:var(--tx);border:0;box-shadow:none;border-radius:8px;justify-content:flex-start;text-align:left;font-weight:600}
 .menu-pop button:hover,.menu-pop button:focus-visible{filter:none;background:var(--capa)}
@@ -276,16 +289,83 @@ function pintarCuentaEnMenu(u){
 
 // ---------- Menú de la cuenta: botón con foto y nombre en la cabecera + panel lateral «Configuración» ----------
 // El panel se despliega desde la derecha ocupando todo el alto. Opciones: Mi cuenta, Usuarios, Etiquetas y Salir.
-//   Usuarios y Etiquetas solo las ven quienes pueden editar (puedeEditar). Se cierra con la X, tocando fuera o con Esc.
+//   Usuarios y Etiquetas solo las ven quienes pueden editar (puedeEditar). Tema la ven todas las cuentas. Se cierra con la X, tocando fuera o con Esc.
 // (no van en la barra de navegación: son acciones de la cuenta, no secciones de contenido)
 const PERSONA='<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>';
 const ETIQ='<path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/>';
 const sv=(p,s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+// =====================================================================
+//  TEMA  ·  modo claro / oscuro, color principal y color de los acordes
+//  Cada cuenta elige lo suyo en el panel «Configuración» → «Tema» (cualquier rol).
+//   - Se guarda en la cuenta (usuarios/<id>.tema = {modo, color, acordes}) y una copia en este
+//     dispositivo (localStorage «tema») que index.html aplica antes de dibujar, para que no parpadee.
+//   - Sin elegir nada, todos quedan como siempre: modo claro, Azul y acordes rojos.
+//   - modo: 'claro' | 'oscuro' | 'auto' (sigue al dispositivo).  color: ver COLORES_TEMA.
+//   - Los colores de cada paleta (claro y oscuro) están en estilos.css, sección 1b.
+//   - Las hojas de canciones siguen siempre blancas; los acordes usan --acorde (hoja.js y editor.js).
+//   - La ventana Compartir (#ver/) no usa el tema (index.html lo omite ahí).
+// =====================================================================
+const COLORES_TEMA=[['azul','Azul','#1F2A4D'],['verde','Verde','#1F4D3A'],['turquesa','Turquesa','#0F4C5C'],['morado','Morado','#3B2A5E'],['vino','Vino','#5A1F36'],['naranja','Naranja','#A8461A'],['grafito','Grafito','#2B2F3A']];
+const ACORDES_TEMA=[['#B3261E','Rojo'],['#1F6FEB','Azul'],['#2E7D32','Verde'],['#7B1FA2','Morado'],['#C25E00','Naranja'],['#1D2233','Negro']];
+const TEMA0={modo:'claro',color:'azul',acordes:'#B3261E'};
+const SOL='<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+const LUNA='<path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>';
+const AUTO='<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/>';
+const PALETA='<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 100 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.3-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4c3 0 5.6-2.5 5.6-5.6C22 6 17.5 2 12 2z"/>';
+let temaActual={...TEMA0},alCambiarModo=null;
+// Aplica el tema a toda la app (y guarda la copia de este dispositivo)
+export function aplicarTema(t){
+  temaActual={...TEMA0,...(t||{})};
+  if(!COLORES_TEMA.some(c=>c[0]===temaActual.color))temaActual.color='azul';
+  const d=document.documentElement,mq=matchMedia('(prefers-color-scheme: dark)');
+  const poner=()=>{
+    const oscuro=temaActual.modo==='oscuro'||(temaActual.modo==='auto'&&mq.matches);
+    d.dataset.modo=oscuro?'oscuro':'claro';d.dataset.color=temaActual.color;
+    d.style.setProperty('--acorde',temaActual.acordes);
+    const m=document.querySelector('meta[name=theme-color]'),c=getComputedStyle(d).getPropertyValue('--cab').trim();
+    if(m&&c)m.content=c;                                   // el color de la barra del navegador en el celular
+  };
+  if(alCambiarModo){mq.removeEventListener('change',alCambiarModo);alCambiarModo=null}
+  if(temaActual.modo==='auto'){alCambiarModo=poner;mq.addEventListener('change',alCambiarModo)}
+  poner();
+  try{localStorage.setItem('tema',JSON.stringify(temaActual))}catch(e){}
+}
+// La ventana del panel «Configuración» → «Tema». Todo se aplica al instante; no hay botón de guardar.
+function ventanaTema(){
+  const o=modal('<div id="tm"></div>'),z=$('#tm',o);
+  const mismo=(a,b)=>String(a).toLowerCase()===String(b).toLowerCase();
+  const pinta=()=>{
+    const t=temaActual;
+    const pt=(attr,hex,nombre,sel)=>`<button class="tm-sw" ${attr} aria-pressed="${sel}"><span class="tm-pt" style="background:${hex}"></span><span>${nombre}</span></button>`;
+    z.innerHTML=`<div class="mh"><h2>Tema</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
+      <h3 class="tm-h">Modo</h3>
+      <div class="tm-modos" role="group" aria-label="Modo">${[['claro','Claro',SOL],['oscuro','Oscuro',LUNA],['auto','Autom\u00e1tico',AUTO]].map(([v,n,p])=>`<button data-modo="${v}" aria-pressed="${t.modo===v}">${sv(p,20)}<span>${n}</span></button>`).join('')}</div>
+      <h3 class="tm-h">Color</h3>
+      <div class="tm-grid" role="group" aria-label="Color">${COLORES_TEMA.map(([v,n,hex])=>pt(`data-color="${v}"`,hex,n,t.color===v)).join('')}</div>
+      <h3 class="tm-h">Color de los acordes</h3>
+      <div class="tm-grid" role="group" aria-label="Color de los acordes">${ACORDES_TEMA.map(([hex,n])=>pt(`data-acorde="${hex}"`,hex,n,mismo(t.acordes,hex))).join('')}</div>
+      <div class="tm-prev" aria-hidden="true"><span class="tm-ac">C          G          Am</span><br>Gloria a Dios en el cielo</div>
+      <p class="tm-nota">Se guarda en tu cuenta y se aplica al instante. Las hojas de canciones siguen siendo blancas para leerlas e imprimirlas bien.</p>`;
+  };
+  pinta();
+  o.onclick=e=>{
+    const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+    if(d.cx!=null){o.remove();return}
+    const cambio=d.modo?{modo:d.modo}:d.color?{color:d.color}:d.acorde?{acordes:d.acorde}:null;
+    if(!cambio)return;
+    const nuevo={...temaActual,...cambio};
+    aplicarTema(nuevo);pinta();
+    const a=sesion();
+    if(a)Promise.resolve().then(()=>guardar('usuarios',a.id,{tema:nuevo})).catch(()=>aviso('No se pudo guardar el tema en tu cuenta.'));
+  };
+}
+
 let alEscape=null;
 export function montarMenuUsuario(salir){
   const actor=sesion();
   const header=document.querySelector('header');
   if(!header||!actor||header.querySelector('.menu-usuario'))return;
+  aplicarTema(actor.tema);                         // TEMA: el de la cuenta (o el de siempre si nunca eligió)
   const viejo=document.getElementById('pcfg');if(viejo)viejo.remove();
   if(alEscape)document.removeEventListener('keydown',alEscape);
   const nombre=esc(actor.nombre||actor.correo);
@@ -306,6 +386,7 @@ export function montarMenuUsuario(salir){
     const ed=puedeEditar(),h=location.hash.slice(1),ac=x=>`aria-current="${h===x}"`;
     ops.innerHTML=`<button data-mc ${ac('cuenta')}>${sv(PERSONA)} Mi cuenta</button>`
       +(ed?`<button data-us ${ac('usuarios')}>${ic('usr',18)} Usuarios</button><button data-et ${ac('etiquetas')}>${sv(ETIQ)} Etiquetas</button>`:'')
+      +`<button data-tm>${sv(PALETA)} Tema</button>`
       +`<button class="pcfg-sal" data-sal>${ic('out',18)} Salir</button>`;
   };
   const abrir=()=>{armar();const barra=innerWidth-document.documentElement.clientWidth;capa.classList.add('abierta');boton.setAttribute('aria-expanded','true');document.body.style.overflow='hidden';if(barra>0)document.body.style.paddingRight=barra+'px';capa.querySelector('.pcfg-cab .ic').focus({preventScroll:true})};   // el ancho de la barra de scroll se reserva para que la página no se corra (temblor)
@@ -317,6 +398,7 @@ export function montarMenuUsuario(salir){
     else if(d.mc!=null){cerrar(false);location.hash='cuenta'}
     else if(d.us!=null){cerrar(false);location.hash='usuarios'}
     else if(d.et!=null){cerrar(false);location.hash='etiquetas'}
+    else if(d.tm!=null){cerrar(false);ventanaTema()}
     else if(d.sal!=null){cerrar(false);salir()}
   };
   alEscape=e=>{if(e.key==='Escape')cerrar(true)};

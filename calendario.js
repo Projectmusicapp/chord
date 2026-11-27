@@ -12,17 +12,17 @@ st.textContent=`.cols{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap
 .cal .w{text-align:center;font-size:12.5px;font-weight:700;color:var(--gris);padding:4px 0 6px}
 .cal .d{background:var(--capa);color:var(--tx);border-radius:var(--r-m);min-height:96px;min-width:0;padding:7px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:3px;border:2px solid transparent;text-align:left;font-weight:500;overflow:hidden}
 .cal .d:hover{filter:none;border-color:var(--linea-2)}.cal .d b{font-size:13px;align-self:flex-start;min-width:24px;height:24px;display:grid;place-items:center;border-radius:999px;padding:0 6px;margin:-2px 0 2px -2px}
-.cal .d.hoy b{background:var(--oro);color:var(--azul)}
-.cal .d.sel{border-color:var(--azul);background:var(--blanco);box-shadow:var(--sombra-2)}
+.cal .d.hoy b{background:var(--oro);color:var(--sobre-oro)}
+.cal .d.sel{border-color:var(--azul-tx);background:var(--blanco);box-shadow:var(--sombra-2)}
 .cal .p{font-size:11px;font-weight:700;color:#fff;border-radius:6px;padding:2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:1.5}
-.cal .p.rep{background:var(--suave);color:var(--azul);display:flex;align-items:center;gap:4px}.cal small{color:var(--gris);font-size:11px;font-weight:600}
+.cal .p.rep{background:var(--suave);color:var(--azul-tx);display:flex;align-items:center;gap:4px}.cal small{color:var(--gris);font-size:11px;font-weight:600}
 .pan{display:flex;flex-direction:column;gap:14px;position:sticky;top:86px}
 .pan .fecha h2{margin:0;font-size:26px;display:flex;align-items:center;gap:10px}.pan .fecha small{color:var(--gris);font-weight:600}
-.hoyb{background:var(--oro);color:var(--azul);font-family:var(--fuente);font-size:12px;font-weight:800;border-radius:20px;padding:3px 10px}
+.hoyb{background:var(--oro);color:var(--sobre-oro);font-family:var(--fuente);font-size:12px;font-weight:800;border-radius:20px;padding:3px 10px}
 .ev{display:flex;gap:12px;align-items:center;background:var(--capa);border-radius:var(--r-m);padding:12px}
 .ev .bar{width:5px;align-self:stretch;border-radius:3px;flex:none}.ev .t{flex:1;min-width:0}.ev .hora{color:var(--gris);font-weight:600;font-size:13.5px;margin-left:4px}.ev small{color:var(--gris);display:block;overflow-wrap:anywhere}
 .ev.rp{background:var(--suave)}
-.evrep{display:inline-flex;align-items:center;gap:6px;margin-top:6px;min-height:32px;padding:4px 10px;font-size:13px;background:var(--blanco);color:var(--azul);border:1px solid var(--linea-2);max-width:100%}
+.evrep{display:inline-flex;align-items:center;gap:6px;margin-top:6px;min-height:32px;padding:4px 10px;font-size:13px;background:var(--blanco);color:var(--azul-tx);border:1px solid var(--linea-2);max-width:100%}
 .evrep span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .evr{display:flex;align-items:center;min-width:0}.evr .evrep{min-width:0}.evr .evq{flex:none;margin-top:6px}
 .evrep.nuevo{border-style:dashed;color:var(--gris)}
@@ -35,7 +35,7 @@ st.textContent=`.cols{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap
 .mrep .lista3 small{color:var(--gris);font-weight:500;flex:none}
 .sw{width:30px;height:30px;min-height:0;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px var(--linea-2);padding:0}
 .sw:hover{filter:none;transform:scale(1.08)}
-.sw.on{box-shadow:0 0 0 2px var(--azul)}
+.sw.on{box-shadow:0 0 0 2px var(--azul-tx)}
 .resaltar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13.5px;font-weight:700;color:var(--gris)}
 .colores{display:flex;gap:7px;flex-wrap:wrap}
 .pan .linea{height:1px;background:var(--linea);margin:2px 0}
@@ -47,7 +47,7 @@ st.textContent=`.cols{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap
   .cal .p{height:5px;padding:0;font-size:0;border-radius:3px}.cal .p.rep{background:var(--azul)}.cal .p.rep svg{display:none}.cal small{font-size:10px;line-height:1}.cal .w{font-size:11px}.cal .d .lit{font-size:0;height:4px;padding:0;border-radius:3px;background:var(--linea-2)}}
 .cal .lit{font-size:10.5px;font-weight:600;color:var(--gris);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 .cmn{position:relative;flex:none}
-.cmn summary{list-style:none;width:38px;height:38px;display:grid;place-items:center;background:var(--suave);color:var(--azul);border-radius:var(--r-m);cursor:pointer;font-size:20px;font-weight:700;line-height:1;user-select:none;-webkit-tap-highlight-color:transparent}
+.cmn summary{list-style:none;width:38px;height:38px;display:grid;place-items:center;background:var(--suave);color:var(--azul-tx);border-radius:var(--r-m);cursor:pointer;font-size:20px;font-weight:700;line-height:1;user-select:none;-webkit-tap-highlight-color:transparent}
 .cmn summary::-webkit-details-marker{display:none}.cmn summary:focus-visible{outline:2px solid var(--oro);outline-offset:2px}.cmn[open]{z-index:12}
 @media(hover:hover){.cmn summary:hover{filter:brightness(.94)}}@media(pointer:coarse){.cmn summary{width:42px;height:42px}}
 .cmn>div{position:absolute;right:0;top:100%;margin-top:6px;background:var(--blanco);border:1px solid var(--linea);border-radius:12px;box-shadow:var(--sombra-2);padding:8px;width:max-content;min-width:230px;max-width:min(290px,calc(100vw - 28px));display:grid;gap:2px;text-align:left}
@@ -132,7 +132,7 @@ function pPan(){
   }else{
     h+=bloqueLit(dt);
     h+=(evs.map(e=>`<div class="ev"><span class="bar" style="background:${e.color}"></span><div class="t"><b>${esc(e.titulo)}</b>${e.hora?`<span class="hora">${esc(e.hora)}</span>`:''}${e.notas?`<small>${esc(e.notas)}</small>`:''}${repEv(e)}</div>${editar?`<button class="ic" data-e="${e.id}" aria-label="Editar \u00ab${esc(e.titulo)}\u00bb" title="Editar">${ic('edt',16)}</button><button class="ic rj" data-x="${e.id}" aria-label="Eliminar \u00ab${esc(e.titulo)}\u00bb" title="Eliminar">${ic('trs',16)}</button>`:''}</div>`).join('')||'<p class="vac" style="margin:0">No hay eventos este d\u00eda.</p>')
-      +rs.map(r=>`<div class="ev rp"><div class="t" style="display:flex;align-items:center;gap:10px;font-weight:700;color:var(--azul)">${ic('mus',18)} ${esc(r.nombre)}</div><button data-rep="${r.id}">Abrir</button></div>`).join('')
+      +rs.map(r=>`<div class="ev rp"><div class="t" style="display:flex;align-items:center;gap:10px;font-weight:700;color:var(--azul-tx)">${ic('mus',18)} ${esc(r.nombre)}</div><button data-rep="${r.id}">Abrir</button></div>`).join('')
       +(editar?`<button data-add>${ic('pls',16)} A\u00f1adir evento</button>
       <button class="sec" data-rd>${ic('mus',16)} Crear repertorio para este d\u00eda</button>
       <div class="linea"></div>

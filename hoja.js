@@ -2,16 +2,18 @@
 //  HOJA.JS  ·  Cómo se dibuja una canción en la hoja del repertorio
 //  Lo usan la vista previa de Repertorio y la ventana Compartir (ver.js),
 //  así las dos se ven exactamente igual.
+//  TEMA: la hoja es siempre blanca (también en modo oscuro; fija sus colores con las variables «-base» de estilos.css)
+//  y los acordes usan --acorde, el color que cada cuenta elige en Configuración → Tema (rojo si no eligió).
 // =====================================================================
 import {esc} from "./base.js";
 import {plano} from "./formato.js";
 
 const st=document.createElement('style');
-st.textContent=`.hojap{background:#fff;max-width:794px;padding:44px 52px;box-shadow:var(--sombra-2);border-radius:6px;min-height:520px;font-size:16px;line-height:1.35;margin:0 auto;overflow-x:auto}
+st.textContent=`.hojap{background:#fff;color:var(--tx-base);--azul:var(--azul-base);--azul-tx:var(--azul-base);--tx:var(--tx-base);--gris:var(--gris-base);--linea:var(--linea-base);--linea-2:var(--linea2-base);--oro-texto:var(--oro-texto-base);max-width:794px;padding:44px 52px;box-shadow:var(--sombra-2);border-radius:6px;min-height:520px;font-size:16px;line-height:1.35;margin:0 auto;overflow-x:auto}
 .rt{margin:0 0 4px;font-size:30px}.rf{color:var(--gris);margin-bottom:22px}.rf::first-letter{text-transform:uppercase}.blk{margin:0 0 18px}
 .lab{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--oro-texto);border-bottom:1px solid var(--linea);margin-bottom:6px;padding-bottom:3px}
-.st{font-family:var(--fuente-titulo);font-weight:600;font-size:20px;color:var(--azul);margin:8px 0 4px}.st small{font:600 12.5px var(--fuente);color:var(--gris);margin-left:10px}
-.sg{font-family:Arial,"Helvetica Neue",Helvetica,sans-serif}.rl,.rc{font-family:inherit;white-space:pre-wrap;line-height:var(--lh,1.35)}.rc{white-space:pre;font-weight:700;color:#b3261e}
+.st{font-family:var(--fuente-titulo);font-weight:600;font-size:20px;color:var(--azul-tx);margin:8px 0 4px}.st small{font:600 12.5px var(--fuente);color:var(--gris);margin-left:10px}
+.sg{font-family:Arial,"Helvetica Neue",Helvetica,sans-serif}.rl,.rc{font-family:inherit;white-space:pre-wrap;line-height:var(--lh,1.35)}.rc{white-space:pre;font-weight:700;color:var(--acorde,#b3261e)}
 .falta{color:var(--rojo);font-weight:600;font-size:13px;font-style:normal}.sg{margin-bottom:14px}
 .hojap .falta{font-size:15px;color:var(--gris);text-align:center;padding:60px 20px;border:1px dashed var(--linea-2);border-radius:var(--r-m)}
 .sal{font:600 13px var(--fuente);color:var(--gris);margin:-2px 0 14px;line-height:1.3}
@@ -25,7 +27,7 @@ export const fechaLarga=f=>{if(!f)return'';const [y,m,d]=f.split('-').map(Number
 const FF={'Courier New':'Arial,Courier,monospace','Arial':'Arial,"Courier New",monospace','Lucida Console':'"Lucida Console",Monaco,monospace','Menlo / Monaco':'Menlo,Monaco,"Courier New",monospace'};
 export const fcss=n=>!n?'':(FF[n]||('"'+String(n).replace(/["\\<>]/g,'')+'",sans-serif'));
 export const OKC=/^(#[0-9a-f]{3,8}|rgba?\([\d\s,.]+\))$/i;
-export const est=r=>(r.s?'font-size:'+r.s+'px;':'')+(r.k?'font-weight:700;color:#b3261e;':'')+(r.b?'font-weight:700;':'')+(r.i?'font-style:italic;':'')+((r.u||r.x)?'text-decoration:'+[r.u&&'underline',r.x&&'line-through'].filter(Boolean).join(' ')+';':'')+(OKC.test(r.c||'')?'color:'+r.c+';':'')+(OKC.test(r.h||'')?'background-color:'+r.h+';':'');
+export const est=r=>(r.s?'font-size:'+r.s+'px;':'')+(r.k?'font-weight:700;color:var(--acorde,#b3261e);':'')+(r.b?'font-weight:700;':'')+(r.i?'font-style:italic;':'')+((r.u||r.x)?'text-decoration:'+[r.u&&'underline',r.x&&'line-through'].filter(Boolean).join(' ')+';':'')+(OKC.test(r.c||'')?'color:'+r.c+';':'')+(OKC.test(r.h||'')?'background-color:'+r.h+';':'');
 const hl=(c,t)=>{c=c||[];t=String(t||'');let h='',i=0;while(i<t.length){let j=i;while(j<t.length&&(c[j]||0)===(c[i]||0))j++;h+=OKC.test(c[i]||'')?`<span style="color:${c[i]}">${esc(t.slice(i,j))}</span>`:esc(t.slice(i,j));i=j}return h};
 
 // Álbum de la canción (gris, pequeño, debajo del título). Si no hay álbum no dibuja nada.

@@ -132,6 +132,6 @@ hoja.textContent=`.bandera{width:34px;height:25px;flex:none;display:block;object
 .sb .sb-lista[hidden]{display:none}
 .sb .sb-op{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding:6px 12px;background:transparent;color:var(--tx);border:0;border-radius:0;font-weight:600;text-align:left;justify-content:flex-start}
 .sb .sb-op:hover,.sb .sb-op:focus-visible{filter:none;background:var(--capa)}
-.sb .sb-op[aria-selected=true]{background:var(--suave);color:var(--azul)}
+.sb .sb-op[aria-selected=true]{background:var(--suave);color:var(--azul-tx)}
 .sb .bandera{width:28px;height:21px}`;
 document.head.append(hoja);

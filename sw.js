@@ -14,7 +14,7 @@
 //  de abajo (p. ej. al agregar un archivo .js nuevo a la app), así los
 //  dispositivos borran la copia vieja y guardan la nueva.
 // =====================================================================
-const CACHE_VERSION='v1';
+const CACHE_VERSION='v2';
 const CACHE='musicapp-'+CACHE_VERSION;
 
 // El cascarón de la app: todo lo que hace falta para que la página cargue y funcione,
@@ -24,7 +24,7 @@ const CASCARON=[
   './','index.html','estilos.css','manifest.json','icon.svg','icon-192.png','icon-512.png',
   'firebase-config.js','base.js','estado.js','misiones.js','banderas.js','usuarios.js',
   'login.js','respaldo.js','canciones.js','editor.js','etiquetas.js','escalas.js','equipos.js',
-  'calendario.js','milista.js','repertorio.js','ver.js','hoja.js','musica.js','formato.js',
+  'calendario.js','milista.js','repertorio.js','ver.js','hoja.js','musica.js','formato.js','liturgico.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js'
