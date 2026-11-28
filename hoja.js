@@ -32,8 +32,10 @@ export const fechaLarga=f=>{if(!f)return'';const [y,m,d]=f.split('-').map(Number
 const FF={'Courier New':'Arial,Courier,monospace','Arial':'Arial,"Courier New",monospace','Lucida Console':'"Lucida Console",Monaco,monospace','Menlo / Monaco':'Menlo,Monaco,"Courier New",monospace'};
 export const fcss=n=>!n?'':(FF[n]||('"'+String(n).replace(/["\\<>]/g,'')+'",sans-serif'));
 export const OKC=/^(#[0-9a-f]{3,8}|rgba?\([\d\s,.]+\))$/i;
-export const est=r=>(r.s?'font-size:'+r.s+'px;':'')+(r.k?'font-weight:700;color:var(--acorde,#b3261e);':'')+(r.b?'font-weight:700;':'')+(r.i?'font-style:italic;':'')+((r.u||r.x)?'text-decoration:'+[r.u&&'underline',r.x&&'line-through'].filter(Boolean).join(' ')+';':'')+(OKC.test(r.c||'')?'color:'+r.c+';':'')+(OKC.test(r.h||'')?'background-color:'+r.h+';':'');
-const hl=(c,t)=>{c=c||[];t=String(t||'');let h='',i=0;while(i<t.length){let j=i;while(j<t.length&&(c[j]||0)===(c[i]||0))j++;h+=OKC.test(c[i]||'')?`<span style="color:${c[i]}">${esc(t.slice(i,j))}</span>`:esc(t.slice(i,j));i=j}return h};
+// ROJOV: el rojo antiguo de los acordes (#b3261e). En las canciones se pinta con el color de acordes que eligió cada cuenta (Tema); solo la letra normal no se toca.
+const ROJOV=c=>{c=String(c||'').toLowerCase().replace(/\s/g,'');return c==='#b3261e'||c==='rgb(179,38,30)'};
+export const est=(r,cr)=>(r.s?'font-size:'+r.s+'px;':'')+(r.k?'font-weight:700;color:var(--acorde,#b3261e);':'')+(r.b?'font-weight:700;':'')+(r.i?'font-style:italic;':'')+((r.u||r.x)?'text-decoration:'+[r.u&&'underline',r.x&&'line-through'].filter(Boolean).join(' ')+';':'')+(OKC.test(r.c||'')?(cr&&ROJOV(r.c)?'color:var(--acorde,#b3261e);':'color:'+r.c+';'):'')+(OKC.test(r.h||'')?'background-color:'+r.h+';':'');
+const hl=(c,t)=>{c=c||[];t=String(t||'');let h='',i=0;while(i<t.length){let j=i;while(j<t.length&&(c[j]||0)===(c[i]||0))j++;h+=OKC.test(c[i]||'')?`<span style="color:${ROJOV(c[i])?'var(--acorde,#b3261e)':c[i]}">${esc(t.slice(i,j))}</span>`:esc(t.slice(i,j));i=j}return h};
 
 // Álbum de la canción (gris, pequeño, debajo del título). Si no hay álbum no dibuja nada.
 const albumHtml=a=>a?`<div class="sal">${esc(a)}</div>`:'';
@@ -51,7 +53,7 @@ export const textoHtml=t=>{const ls=lineasTx(t),f=fcss(t&&t.fuente);return ls.so
 function hojaAcordes(c,o){
   const f=fcss(c.fuenteA),tono=c.tonoAct||c.tono;
   let h=`<div class="sg" style="${f?'font-family:'+f+';':''}${c.lh?'--lh:'+c.lh+';':''}"><div class="st">${esc(c.titulo)}${(o.tono||tonoNormal)(tono||'')}</div>${albumHtml(o.album)}`;
-  c.lineasA.forEach(l=>{h+=`<div class="rl" style="font-size:${l.s||16}px;padding-left:${(l.n||0)*28}px;${l.a?'text-align:'+l.a+';':''}">${l.r.map(x=>`<span style="${est(x)}">${esc(x.t)}</span>`).join('')||'&nbsp;'}</div>`});
+  c.lineasA.forEach(l=>{h+=`<div class="rl" style="font-size:${l.s||16}px;padding-left:${(l.n||0)*28}px;${l.a?'text-align:'+l.a+';':''}">${l.r.map(x=>`<span style="${est(x,1)}">${esc(x.t)}</span>`).join('')||'&nbsp;'}</div>`});
   return h+'</div>';
 }
 // cancion(c, ac, o): dibuja una canción. ac = mostrar acordes.
@@ -67,7 +69,7 @@ export function cancion(c,ac,o={}){
   L.forEach((l,i)=>{
     const z=l.s||16,ca=ac&&c.ac&&c.ac[i];
     if(ca&&ca.trim())h+=`<div class="rc" style="font-size:${z}px;padding-left:${(l.n||0)*28}px">${hl(cc['a'+i],ca)}</div>`;
-    h+=`<div class="rl" style="font-size:${z}px;padding-left:${(l.n||0)*28}px;${!ac&&l.a?'text-align:'+l.a+';':''}">${l.r.map(r=>`<span style="${est(r)}">${esc(r.t)}</span>`).join('')||'&nbsp;'}</div>`;
+    h+=`<div class="rl" style="font-size:${z}px;padding-left:${(l.n||0)*28}px;${!ac&&l.a?'text-align:'+l.a+';':''}">${l.r.map(r=>`<span style="${est(r,1)}">${esc(r.t)}</span>`).join('')||'&nbsp;'}</div>`;
     if(ac)it.filter(x=>x.despues===i).forEach(x=>{if((x.texto||'').trim())h+=blq('Interludio',x.texto,'i:'+x.id)});
   });
   if(ac)it.filter(x=>x.despues<0||x.despues>=L.length).forEach(x=>{if((x.texto||'').trim())h+=blq('Interludio',x.texto,'i:'+x.id)});

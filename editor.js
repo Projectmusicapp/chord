@@ -150,7 +150,7 @@ export function abrir(s,alCerrar,opc={}){
   ed.albumId=ed.albumId||A[0]?.id;
   ed.lineas=structuredClone(s.lineas||(s.letra||'').split('\n').map(t=>({r:t?[{t}]:[]}))).map(l=>armar(l,aChars(l)));
   if(!ed.ac){ed.ac={};for(const l in ed.acordes){let f='';[...ed.acordes[l]].sort((a,b)=>a.i-b.i).forEach(a=>{f=f.padEnd(a.i,' ')+(f.length>a.i?' ':'')+a.c});ed.ac[l]=f}}
-  let modo='letra',verEt=false,eq='',rango=null,rangoCol=null,modoAcorde=false,pincel=null,pend=null,zoom=100,plegada=false,popAb=null,uc='#B3261E',uh='#FFF176',ancla=null,inicial='',base='',teniaAcordes=false;
+  let modo='letra',verEt=false,eq='',rango=null,rangoCol=null,modoAcorde=false,pincel=null,pend=null,zoom=100,plegada=false,popAb=null,uc='#B3161E',uh='#FFF176',ancla=null,inicial='',base='',teniaAcordes=false;
   // rango: la última selección hecha dentro de la hoja (con o sin texto). pend: formato «pendiente» para lo que escribas sin selección.
   const ov=document.createElement('div');ov.id='editor';ov.className='ed';document.body.append(ov);
   // ===== TIEMPOS · desplegable de etiquetas agrupado (Momentos de la misa · Tiempos lit\u00fargicos · Otros) =====
