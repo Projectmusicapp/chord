@@ -302,3 +302,36 @@ $('#nav').addEventListener('click',e=>{
   const enlace=e.target.closest('a');
   if(enlace&&enlace.getAttribute('href')==='#'+vista())dispatchEvent(new CustomEvent('reinicio',{detail:vista()}));
 });
+
+// =====================================================================
+//  TEMA  ·  modo claro / oscuro, color principal y color de los acordes
+//  Cada cuenta elige lo suyo en el panel «Configuración» → «Tema» (ventana en usuarios.js).
+//   - Se guarda en la cuenta (usuarios/<id>.tema = {modo, color, acordes}) y una copia en este
+//     dispositivo (localStorage «tema») que index.html aplica antes de dibujar, para que no parpadee.
+//   - Sin elegir nada: modo claro, Azul y acordes rojos (TEMA0).
+//   - modo: 'claro' | 'oscuro' | 'auto' (sigue al dispositivo).
+//   - Los colores de cada paleta (claro y oscuro) están en estilos.css, sección 1b.
+//   - Lo usan usuarios.js (al entrar y en la ventana Tema) y login.js (la ventana Compartir #ver/,
+//     que aplica el tema de quien tenga sesión en ese navegador y el de siempre si no).
+// =====================================================================
+export const TEMA0={modo:'claro',color:'azul',acordes:'#B3261E'};
+const COLORES_OK=['azul','verde','turquesa','morado','vino','naranja','grafito'];
+let temaVig={...TEMA0},alCambiarModo=null;
+export const temaVigente=()=>temaVig;
+// Aplica el tema a toda la página. guardarCopia=false: no toca la copia de este dispositivo (p. ej. visitante sin cuenta).
+export function aplicarTema(t,guardarCopia=true){
+  temaVig={...TEMA0,...(t||{})};
+  if(!COLORES_OK.includes(temaVig.color))temaVig.color='azul';
+  const d=document.documentElement,mq=matchMedia('(prefers-color-scheme: dark)');
+  const poner=()=>{
+    const oscuro=temaVig.modo==='oscuro'||(temaVig.modo==='auto'&&mq.matches);
+    d.dataset.modo=oscuro?'oscuro':'claro';d.dataset.color=temaVig.color;
+    d.style.setProperty('--acorde',temaVig.acordes);
+    const m=document.querySelector('meta[name=theme-color]'),c=getComputedStyle(d).getPropertyValue('--cab').trim();
+    if(m&&c)m.content=c;                                   // el color de la barra del navegador en el celular
+  };
+  if(alCambiarModo){mq.removeEventListener('change',alCambiarModo);alCambiarModo=null}
+  if(temaVig.modo==='auto'){alCambiarModo=poner;mq.addEventListener('change',alCambiarModo)}
+  poner();
+  if(guardarCopia){try{localStorage.setItem('tema',JSON.stringify(temaVig))}catch(e){}}
+}

@@ -53,6 +53,8 @@ html:has(#editor.ed),html:has(#editor.ed) body{overflow:hidden}
 .pg{background:linear-gradient(90deg,#f1f3f8 0,#f1f3f8 34px,#fff 34px);max-width:794px;min-height:1123px;margin:10px auto 40px;padding:48px 56px;box-shadow:0 2px 14px #0003;font-size:16px;line-height:var(--lh,1.35);font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;color:#1d2233;--azul:var(--azul-base);--azul-tx:var(--azul-base);--tx:var(--tx-base);--gris:var(--gris-base);--linea:var(--linea-base);--oro-texto:var(--oro-texto-base)}
 @media(max-width:700px){.pg{padding:20px 14px 20px 44px;min-height:80vh}}
 .le{outline:none;min-height:400px}.ln{white-space:pre-wrap;min-height:1.35em}
+:root[data-modo=oscuro] .pg{background:linear-gradient(90deg,var(--pg-pre2) 0,var(--pg-pre2) 34px,var(--hoja-pre) 34px);filter:invert(1) hue-rotate(180deg);box-shadow:none}
+:root[data-modo=oscuro] .pg [style*="background-color"]{filter:invert(1) hue-rotate(180deg)}
 .ln [data-k]{font-weight:700;color:var(--acorde,#b3261e)}
 .fl{overflow-x:auto}.fl .ln{white-space:pre}
 .rib{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:6px}.rib .sp{width:1px;height:24px;background:var(--linea-2);margin:0 4px}

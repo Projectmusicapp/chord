@@ -43,7 +43,7 @@
 //  Una cuenta creada desde «Nueva cuenta» queda con requiereVerificacion:false:
 //  se confía en quien la dio de alta. Solo el autorregistro exige verificar.
 // =====================================================================
-import {$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,esAdministrador,puedeEditar,configActual,hoyLargo,auth,cambiarMiClave,crearCuentaAuth,crearCuentaComoAdmin,enviarVerificacion,definirApariencia,refrescarCabecera,recargarUsuarioAuth,GENERAL,esNivelGeneral,rolesDe,espaciosDe,nivelEn,camposDeRoles,nivelActivo,espacioActual,ambitoActual,cambiarEspacio} from "./base.js";
+import {aplicarTema,temaVigente,$,esc,guardar,crear,eliminar,escuchar,vistas,ic,modal,aviso,imagen,sesion,establecerSesion,esNivelAdmin,esAdministrador,puedeEditar,configActual,hoyLargo,auth,cambiarMiClave,crearCuentaAuth,crearCuentaComoAdmin,enviarVerificacion,definirApariencia,refrescarCabecera,recargarUsuarioAuth,GENERAL,esNivelGeneral,rolesDe,espaciosDe,nivelEn,camposDeRoles,nivelActivo,espacioActual,ambitoActual,cambiarEspacio} from "./base.js";
 import {ventana as abrirRespaldo} from "./respaldo.js";
 import "./etiquetas.js";   // PANEL: registra la pantalla «Etiquetas» (#etiquetas), que ya no se abre desde Canciones
 import {E,alCambiar} from "./estado.js";
@@ -302,40 +302,22 @@ const sv=(p,s=18)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="no
 //   - Sin elegir nada, todos quedan como siempre: modo claro, Azul y acordes rojos.
 //   - modo: 'claro' | 'oscuro' | 'auto' (sigue al dispositivo).  color: ver COLORES_TEMA.
 //   - Los colores de cada paleta (claro y oscuro) están en estilos.css, sección 1b.
-//   - Las hojas de canciones siguen siempre blancas; los acordes usan --acorde (hoja.js y editor.js).
-//   - La ventana Compartir (#ver/) no usa el tema (index.html lo omite ahí).
+//   - Las hojas de canciones también se ven oscuras en modo oscuro (hoja.js y editor.js); los acordes usan --acorde.
+//   - La ventana Compartir (#ver/) aplica el tema de quien tenga sesión en ese navegador (ver login.js).
+//   - El código central (aplicarTema) está en base.js.
 // =====================================================================
 const COLORES_TEMA=[['azul','Azul','#1F2A4D'],['verde','Verde','#1F4D3A'],['turquesa','Turquesa','#0F4C5C'],['morado','Morado','#3B2A5E'],['vino','Vino','#5A1F36'],['naranja','Naranja','#A8461A'],['grafito','Grafito','#2B2F3A']];
 const ACORDES_TEMA=[['#B3261E','Rojo'],['#1F6FEB','Azul'],['#2E7D32','Verde'],['#7B1FA2','Morado'],['#C25E00','Naranja'],['#1D2233','Negro']];
-const TEMA0={modo:'claro',color:'azul',acordes:'#B3261E'};
 const SOL='<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
 const LUNA='<path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>';
 const AUTO='<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/>';
 const PALETA='<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 100 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.3-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4c3 0 5.6-2.5 5.6-5.6C22 6 17.5 2 12 2z"/>';
-let temaActual={...TEMA0},alCambiarModo=null;
-// Aplica el tema a toda la app (y guarda la copia de este dispositivo)
-export function aplicarTema(t){
-  temaActual={...TEMA0,...(t||{})};
-  if(!COLORES_TEMA.some(c=>c[0]===temaActual.color))temaActual.color='azul';
-  const d=document.documentElement,mq=matchMedia('(prefers-color-scheme: dark)');
-  const poner=()=>{
-    const oscuro=temaActual.modo==='oscuro'||(temaActual.modo==='auto'&&mq.matches);
-    d.dataset.modo=oscuro?'oscuro':'claro';d.dataset.color=temaActual.color;
-    d.style.setProperty('--acorde',temaActual.acordes);
-    const m=document.querySelector('meta[name=theme-color]'),c=getComputedStyle(d).getPropertyValue('--cab').trim();
-    if(m&&c)m.content=c;                                   // el color de la barra del navegador en el celular
-  };
-  if(alCambiarModo){mq.removeEventListener('change',alCambiarModo);alCambiarModo=null}
-  if(temaActual.modo==='auto'){alCambiarModo=poner;mq.addEventListener('change',alCambiarModo)}
-  poner();
-  try{localStorage.setItem('tema',JSON.stringify(temaActual))}catch(e){}
-}
 // La ventana del panel «Configuración» → «Tema». Todo se aplica al instante; no hay botón de guardar.
 function ventanaTema(){
   const o=modal('<div id="tm"></div>'),z=$('#tm',o);
   const mismo=(a,b)=>String(a).toLowerCase()===String(b).toLowerCase();
   const pinta=()=>{
-    const t=temaActual;
+    const t=temaVigente();
     const pt=(attr,hex,nombre,sel)=>`<button class="tm-sw" ${attr} aria-pressed="${sel}"><span class="tm-pt" style="background:${hex}"></span><span>${nombre}</span></button>`;
     z.innerHTML=`<div class="mh"><h2>Tema</h2><button class="ic" data-cx aria-label="Cerrar">${ic('x')}</button></div>
       <h3 class="tm-h">Modo</h3>
@@ -345,7 +327,7 @@ function ventanaTema(){
       <h3 class="tm-h">Color de los acordes</h3>
       <div class="tm-grid" role="group" aria-label="Color de los acordes">${ACORDES_TEMA.map(([hex,n])=>pt(`data-acorde="${hex}"`,hex,n,mismo(t.acordes,hex))).join('')}</div>
       <div class="tm-prev" aria-hidden="true"><span class="tm-ac">C          G          Am</span><br>Gloria a Dios en el cielo</div>
-      <p class="tm-nota">Se guarda en tu cuenta y se aplica al instante. Las hojas de canciones siguen siendo blancas para leerlas e imprimirlas bien.</p>`;
+      <p class="tm-nota">Se guarda en tu cuenta y se aplica al instante. En modo oscuro las hojas de canciones también se ven oscuras; al imprimir siempre salen en blanco.</p>`;
   };
   pinta();
   o.onclick=e=>{
@@ -353,7 +335,7 @@ function ventanaTema(){
     if(d.cx!=null){o.remove();return}
     const cambio=d.modo?{modo:d.modo}:d.color?{color:d.color}:d.acorde?{acordes:d.acorde}:null;
     if(!cambio)return;
-    const nuevo={...temaActual,...cambio};
+    const nuevo={...temaVigente(),...cambio};
     aplicarTema(nuevo);pinta();
     const a=sesion();
     if(a)Promise.resolve().then(()=>guardar('usuarios',a.id,{tema:nuevo})).catch(()=>aviso('No se pudo guardar el tema en tu cuenta.'));

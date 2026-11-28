@@ -8,9 +8,8 @@
 <meta name="theme-color" content="#1F2A4D">
 <script>
 /* TEMA: aplica, antes de dibujar la página, el tema guardado en este dispositivo (modo, color y acordes) para que no parpadee.
-   No se usa en la ventana Compartir (#ver/). La cuenta lo confirma al entrar: ver «Tema» en usuarios.js. */
+   La cuenta lo confirma al entrar (usuarios.js) y, en la ventana Compartir (#ver/), login.js; sin cuenta allí se ve el de siempre. */
 (function(){try{
-  if(location.hash.indexOf('#ver/')===0)return;
   var t=JSON.parse(localStorage.getItem('tema')||'null');if(!t)return;
   var d=document.documentElement;
   d.dataset.modo=(t.modo==='oscuro'||(t.modo==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches))?'oscuro':'claro';

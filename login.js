@@ -1,5 +1,5 @@
 // ===== LOGIN (Firebase Authentication: correo + contraseña, con autorregistro) =====
-import {establecerSesion,alCambiarAuth,iniciarSesionAuth,cerrarSesionAuth,enviarVerificacion,recargarUsuarioAuth,escucharDoc,guardar} from "./base.js";
+import {aplicarTema,establecerSesion,alCambiarAuth,iniciarSesionAuth,cerrarSesionAuth,enviarVerificacion,recargarUsuarioAuth,escucharDoc,guardar} from "./base.js";
 import {montarMenuUsuario,cargado,sinCuentas,misionesDisponibles,crearPrimerAdmin,autorregistrar} from "./usuarios.js";
 import {selectorBandera,activarSelectores} from "./misiones.js";
 import {svgI as svg} from "./formato.js";
@@ -173,6 +173,14 @@ async function iniciarVer() {
   const [base] = await Promise.all(['base', 'ver'].map(m => import(`./${m}.js`)));
   if (base.appCargada) base.appCargada();   // (por si el navegador aún tiene guardada una versión anterior de base.js)
   dispatchEvent(new HashChangeEvent('hashchange'));
+  // TEMA: si quien abre el enlace tiene sesión iniciada en este navegador, se le aplica el tema de su cuenta;
+  // si no tiene cuenta, se ve el de siempre (claro y azul) sin tocar la copia guardada en el dispositivo.
+  let dejarTema = null;
+  alCambiarAuth(user => {
+    if (dejarTema) { dejarTema(); dejarTema = null }
+    if (!user) { aplicarTema(null, false); return }
+    dejarTema = escucharDoc('usuarios', user.uid, d => aplicarTema(d && d.tema));
+  });
   // Si desde aquí se cambia la dirección a otra parte de la app, se recarga para pasar por el login
   addEventListener('hashchange', () => { if (!location.hash.startsWith('#ver/')) location.reload(); });
 }
